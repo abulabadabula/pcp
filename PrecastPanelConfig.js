@@ -54,14 +54,191 @@ export const CODE_BASIS = {
 };
 
 /* ============================================================================
-DEFAULT INPUTS
-Unified input model:
-wallWidth / wallHeight / wallThickness serve BOTH in-plane and OOP
-Reinforcement: VbarDia/VbarSpace/HbarDia/HbarSpace/FootBarDia/FootBarSpace/MeshArea
-gLine / qLine / wwd are roof pressures (kPa), Sr = tributary range
-In-plane diaphragm forces: diaphragmWindForce / diaphragmSeismicForce
-OOP additional point loads for canopy / attachments
-hroof must be ≤ wallHeight - tf/1000 - ds/1000 - ts/1000
+   INPUT SECTION DEFINITIONS 所有输入内容的定义，被Input页面调用
+========================================================================== */
+export const INPUT_SECTIONS = [
+  {
+    id: 'geometry',
+    title: '1. Wall Geometry (Shared)',
+    fields: [
+      { key: 'wallWidth', label: 'Wall Width', unit: 'm', step: '0.1', min: '0.1' },
+      { key: 'wallHeight', label: 'Wall Height', unit: 'm', step: '0.1', min: '0.5' },
+      { key: 'wallThickness', label: 'Wall Thickness', unit: 'm', step: '0.005', min: '0.05' }
+    ]
+  },
+  {
+    id: 'oopGeometry',
+    title: '2. OOP Geometry (Footing / Slab / Hardfill)',
+    fields: [
+      { key: 'tf', label: 'Footing Thickness (tf)', unit: 'mm', step: '10', min: '0' },
+      { key: 'Lf', label: 'Footing Length (Lf)', unit: 'mm', step: '100', min: '0' },
+      { key: 'ts', label: 'Slab Thickness (ts)', unit: 'mm', step: '10', min: '0' },
+      { key: 'fo', label: 'Footing Overhang (fo)', unit: 'mm', step: '10', min: '0' },
+      { key: 'ds', label: 'Hardfill Thickness (ds)', unit: 'mm', step: '10', min: '0' },
+      { key: 'hroof', label: 'Height to Roof (hroof)', unit: 'm', step: '0.1', min: '0' }
+    ]
+  },
+  {
+    id: 'materials',
+    title: '3. Material Properties (Shared)',
+    fields: [
+      { key: 'concreteDensity', label: 'Concrete Density (γc)', unit: 'kN/m³', step: '0.5', min: '15' },
+      { key: 'fc', label: "Concrete Strength f'c", unit: 'MPa', step: '1', min: '15' },
+      { key: 'fy', label: 'Steel Yield (fy)', unit: 'MPa', step: '5', min: '250' },
+      { key: 'fyMesh', label: 'Mesh Yield (fyMesh)', unit: 'MPa', step: '1', min: '0' },
+      { key: 'Es', label: 'Steel Modulus (Es)', unit: 'MPa', step: '1', min: '0' },
+      { key: 'gs', label: 'Hardfill Density (γs)', unit: 'kN/m³', step: '0.1', min: '0' },
+      { key: 'cover', label: 'Concrete Cover', unit: 'mm', step: '1', min: '15' }
+    ]
+  },
+  {
+    id: 'gravity',
+    title: '4. Gravity Loads (Roof Pressures + Tributary Range)',
+    fields: [
+      { key: 'gUniform', label: 'Roof Dead Load Pressure (G)', unit: 'kPa', step: '0.05', min: '0' },
+      { key: 'qUniform', label: 'Roof Live Load Pressure (Q)', unit: 'kPa', step: '0.05', min: '0' },
+      { key: 'wwd', label: 'Roof Wind Pressure (wwd)', unit: 'kPa', step: '0.05', min: '0' },
+      { key: 'Sr', label: 'Tributary Range (Sr)', unit: 'm', step: '0.1', min: '0' }
+    ]
+  },
+  {
+    id: 'inPlaneLoads',
+    title: '5. In-Plane Specific Loads (Roof Diaphragm Forces)',
+    fields: [
+      { key: 'diaphragmWindForce', label: 'Diaphragm Wind Force (at wall top)', unit: 'kN', step: '1', min: '0' },
+      { key: 'diaphragmSeismicForce', label: 'Diaphragm Seismic Force (at wall top)', unit: 'kN', step: '1', min: '0' },
+      { key: 'lintelReaction', label: 'Lintel Reaction', unit: 'kN', step: '1', min: '0' },
+      { key: 'lintelEccentricity', label: 'Lintel Eccentricity', unit: 'm', step: '0.01', min: '0' }
+    ]
+  },
+  {
+    id: 'oopLoads',
+    title: '6. OOP Specific Loads',
+    fields: [
+      { key: 'wwf', label: 'Wall Wind Pressure (wwf)', unit: 'kPa', step: '0.1', min: '0' },
+      { key: 'wf', label: 'Fire Load (wf)', unit: 'kPa', step: '0.1', min: '0' },
+      { key: 'th', label: 'Fire Duration (th)', unit: 'hr', step: '0.1', min: '0' }
+    ]
+  },
+  {
+    id: 'oopAdditional',
+    title: '7. OOP Additional Point Loads (Canopy / Attachments)',
+    fields: [
+      { key: 'additionalForce', label: 'Additional Horizontal Force', unit: 'kN', step: '0.1', min: '0' },
+      { key: 'additionalForceHeight', label: 'Force Height Above Floor', unit: 'm', step: '0.1', min: '0' },
+      { key: 'additionalMoment', label: 'Additional Moment', unit: 'kN·m', step: '0.1', min: '0' },
+      { key: 'additionalMomentHeight', label: 'Moment Height Above Floor', unit: 'm', step: '0.1', min: '0' }
+    ]
+  },
+  {
+    id: 'seismic',
+    title: '8. Seismic Parameters (In-Plane)',
+    fields: [
+      { key: 'hazardFactor', label: 'Hazard Factor Z', unit: '', step: '0.01', min: '0' },
+      { key: 'returnPeriodFactor', label: 'Return Period Factor Ru', unit: '', step: '0.01', min: '0' },
+      { key: 'ductility', label: 'Ductility Factor μ', unit: '', step: '0.05', min: '1' },
+      { key: 'siteCoefficient', label: 'Site Coefficient Ch(T)', unit: '', step: '0.01', min: '0' },
+      { key: 'nearFaultFactor', label: 'Near-Fault Factor N(T,D)', unit: '', step: '0.01', min: '0' },
+      { key: 'period', label: 'Fundamental Period T', unit: 's', step: '0.01', min: '0.01' },
+      { key: 'seismicWeight', label: 'Tributary Seismic Weight', unit: 'kN', step: '1', min: '0' },
+      { key: 'seismicDistributionFactor', label: 'Wall Distribution Factor', unit: '', step: '0.01', min: '0' },
+      { key: 'psiE', label: 'Seismic Combination ψe', unit: '', step: '0.05', min: '0' },
+    ]
+  },
+  {
+    id: 'oopseismic',
+    title: '9. Seismic Parameters (OOP)',
+    fields: [
+      /* v0.7 —— OOP 地震改按 AS/NZS 1170.5 Chapter 8 (parts) 计算  */
+      { key: 'partResponseCoefficient', label: 'OOP Part Response Coefficient Cp', unit: '', step: '0.05', min: '0' },
+      { key: 'partHeightHx', label: 'OOP Part Height hx (above base)', unit: 'm', step: '0.1', min: '0' },
+      { key: 'buildingHeightHn', label: 'Building Height hn', unit: 'm', step: '0.1', min: '0.1' },
+      { key: 'partImportanceFactor', label: 'Part Importance Factor (ap)', unit: '', step: '0.1', min: '0' },
+      { key: 'partResponseModification', label: 'Part Response Modification (Rp)', unit: '', step: '0.1', min: '0.9' },
+      { key: 'partDuctility', label: 'Part Ductility Factor (μp)', unit: '', step: '0.1', min: '1' },
+      { key: 'partPeriod', label: 'Part Fundamental Period (Tp)', unit: 's', step: '0.01', min: '0.01' },
+      { key: 'buildingPeriod', label: 'Building Fundamental Period (Tn)', unit: 's', step: '0.01', min: '0.01' },
+      { key: 'importanceFactor', label: 'Building Importance Factor (I)', unit: '', step: '0.1', min: '1' }
+    ]
+  },
+  {
+    id: 'reinforcement',
+    title: '10. Reinforcement (Shared)',
+    fields: [
+      { key: 'VbarDia', label: 'Vertical Bar Diameter (φV)', unit: 'mm', step: '2', min: '6' },
+      { key: 'VbarSpace', label: 'Vertical Bar Spacing', unit: 'mm', step: '25', min: '50' },
+      { key: 'HbarDia', label: 'Horizontal Bar Diameter (φH)', unit: 'mm', step: '2', min: '6' },
+      { key: 'HbarSpace', label: 'Horizontal Bar Spacing', unit: 'mm', step: '25', min: '50' },
+      { key: 'FootBarDia', label: 'Footing Bar Diameter (φF)', unit: 'mm', step: '2', min: '6' },
+      { key: 'FootBarSpace', label: 'Footing Bar Spacing', unit: 'mm', step: '25', min: '50' },
+      { key: 'MeshArea', label: 'Slab Mesh Area (As)', unit: 'mm²/m', step: '1', min: '0' }
+    ]
+  },
+  {
+    id: 'boundary',
+    title: '11. Boundary Element (In-Plane)',
+    fields: [
+      { key: 'boundaryWidth', label: 'Boundary Width', unit: 'm', step: '0.01', min: '0.05' },
+      { key: 'boundaryThickness', label: 'Boundary Thickness', unit: 'm', step: '0.005', min: '0.05' },
+      { key: 'boundaryBarDiameter', label: 'Boundary Bar Diameter', unit: 'mm', step: '1', min: '6' },
+      { key: 'boundaryBarCount', label: 'Boundary Bar Count', unit: 'bars', step: '1', min: '1' },
+      { key: 'boundaryTieDiameter', label: 'Tie Diameter', unit: 'mm', step: '1', min: '6' },
+      { key: 'boundaryTieSpacing', label: 'Tie Spacing', unit: 'mm', step: '10', min: '50' }
+    ]
+  },
+  {
+    id: 'bearing',
+    title: '12. Lintel Bearing (In-Plane)',
+    fields: [
+      { key: 'bearingWidth', label: 'Bearing Width', unit: 'mm', step: '5', min: '25' },
+      { key: 'bearingLength', label: 'Bearing Length', unit: 'mm', step: '5', min: '25' }
+    ]
+  },
+  {
+    id: 'support',
+    title: '13. OOP Support Conditions & Design Factors',
+    fields: [
+      { key: 'effectiveLengthFactor', label: 'Effective Length Factor K', unit: '', step: '0.05', min: '0.1' },
+      { key: 'phiFlexure', label: 'ϕ Flexure', unit: '', step: '0.01', min: '0' },
+      { key: 'phiShear', label: 'ϕ Shear', unit: '', step: '0.01', min: '0' },
+      { key: 'phiCompression', label: 'ϕ Compression', unit: '', step: '0.01', min: '0' }
+    ]
+  },
+  {
+    id: 'foundation',
+    title: '14. Foundation and Hold Down Check',
+    fields: [
+      { key: 'qU', label: 'Ultimate Bearing Capacity (qU)', unit: 'kPa', step: '10', min: '0' }
+    ]
+  },
+  {
+    id: 'connection',
+    title: '15. Base Connection (Connection Design)',
+    fields: [
+      { key: 'baseDowelDiameter', label: 'Base Dowel Diameter', unit: 'mm', step: '1', min: '6' },
+      { key: 'baseDowelCount', label: 'Base Dowel Count', unit: 'bars', step: '1', min: '0' },
+      { key: 'baseDowelEmbedment', label: 'Dowel Embedment', unit: 'mm', step: '10', min: '0' },
+      { key: 'groutStrength', label: "Grout Strength f'g", unit: 'MPa', step: '1', min: '10' },
+      { key: 'shearKeyDepth', label: 'Shear Key Depth', unit: 'mm', step: '5', min: '0' },
+      { key: 'frictionCoefficient', label: 'Friction Coefficient μ', unit: '', step: '0.05', min: '0' },
+      { key: 'phiConnection', label: 'ϕ Connection', unit: '', step: '0.01', min: '0' }
+    ]
+  },
+  {
+    id: 'inPlaneFoundation',
+    title: '16. In-Plane Foundation (Footing Checks)',
+    fields: [
+      { key: 'footingWidth', label: 'Footing Width B', unit: 'm', step: '0.05', min: '0.1' },
+      { key: 'footingLength', label: 'Footing Length L', unit: 'm', step: '0.05', min: '0.1' },
+      { key: 'footingThickness', label: 'Footing Thickness', unit: 'm', step: '0.05', min: '0.05' },
+      { key: 'allowableBearingPressure', label: 'Allowable Bearing Pressure', unit: 'kPa', step: '10', min: '0' }
+    ]
+  }
+];
+
+
+/* ============================================================================
+DEFAULT INPUTS 必须有，否则控件显示不正常
 ========================================================================== */
 export const DEFAULT_INPUTS = {
   /* --------------------------------------------------------------------------
@@ -107,14 +284,14 @@ export const DEFAULT_INPUTS = {
 
   /* --------------------------------------------------------------------------
   4. UNIFIED Gravity Loads (kPa pressures + tributary range)
-  gLine  – roof permanent (dead) pressure
-  qLine  – roof imposed (live) pressure
+  gUniform  – roof permanent (dead) pressure
+  qUniform  – roof imposed (live) pressure
   wwd    – roof wind pressure (moved from OOP section)
   Sr     – tributary range (m) to convert pressures to line loads
   Line load = pressure × Sr  (kN/m)
   ------------------------------------------------------------------------ */
-  gLine: 0.4,
-  qLine: 0.25,
+  gUniform: 0.5,
+  qUniform: 0.25,
   wwd: 0.33,
   Sr: 2.0,
 
@@ -170,10 +347,16 @@ export const DEFAULT_INPUTS = {
   seismicWeight: 150,
   seismicDistributionFactor: 1.0,
   psiE: 0.30,
-  /* v0.6 —— AS/NZS 1170.5 Chapter 8 part 参数（取代 CdT1 / CdTE） */
+  /* v0.6 —— AS/NZS 1170.5 Chapter 8 part 参数 */
   partResponseCoefficient: 0.75,
   partHeightHx: 2.0,
   buildingHeightHn: 4.0,
+  partImportanceFactor: 1.0,
+  partResponseModification: 1.0,
+  partDuctility: 1.0,
+  partPeriod: 0.1,
+  buildingPeriod: 0.4,
+  importanceFactor: 1.0,
 
   /* --------------------------------------------------------------------------
   9. UNIFIED Reinforcement
