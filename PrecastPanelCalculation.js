@@ -351,8 +351,8 @@ export function calculateInPlaneDesign(input) {
 
   /* Geometry */
   const Ag = b * 1000 * t * 1000;
-  const I = b * 1000 * Math.pow(t * 1000, 3) / 12;
-  const Zg = Math.pow(b * 1000, 2) * (t * 1000) / 6;
+  const I = Math.pow(b * 1000, 3) * t * 1000 / 12;
+  const Zg = Math.pow(b * 1000, 2) * t * 1000 / 6;
 
   /* Self weight */
   const Gwall = gamma * t * h * b;

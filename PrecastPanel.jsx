@@ -84,8 +84,7 @@ function CalculationFormula({ caption, formula, status, highlight = false }) {
       }}
     >
       {caption && (
-        <Typography
-          variant="caption"
+        <Typography variant="caption"
           sx={{
             display: 'block',
             mb: 0.5,
@@ -116,8 +115,7 @@ function CalculationSection({ number, title, chip, children, defaultExpanded = t
   const reportMode = useContext(CalculationReportContext);
   if (reportMode) {
     return (
-      <Paper
-        variant="outlined"
+      <Paper variant="outlined"
         sx={{
           mb: 1.5,
           borderRadius: 1,
@@ -154,8 +152,7 @@ function CalculationSection({ number, title, chip, children, defaultExpanded = t
 function CalculationSubsection({ title, children }) {
   return (
     <Box sx={{ mb: 2.5 }}>
-      <Typography
-        variant="subtitle2"
+      <Typography variant="subtitle2"
         sx={{
           mb: 1, color: 'text.secondary', fontWeight: 800,
           borderLeft: '3px solid', borderColor: 'primary.main', pl: 1
@@ -172,7 +169,6 @@ const mkStatus = (pass, passLabel = 'PASS', failLabel = 'CHECK') => ({
   label: pass ? passLabel : failLabel,
   pass: Boolean(pass)
 });
-
 
 
 /* ============================================================================
@@ -637,8 +633,8 @@ function InputSummaryTable({ inputs }) {
     ['Sp (结构性能系数)', tx(inputs.structuralPerformanceFactor), ''],
     ['Ch(T) (反应谱形状系数)', tx(inputs.spectralShapeFactor), ''],
     ['N(T,D) (近断层系数)', tx(inputs.nearFaultFactor), ''],
-    ['Wt (抗震重量)', tx(inputs.seismicWeight), 'kN'],
-    ['kd (分布系数)', tx(inputs.seismicDistributionFactor), ''],
+    // ['Wt (抗震重量)', tx(inputs.seismicWeight), 'kN'],
+    // ['kd (分布系数)', tx(inputs.seismicDistributionFactor), ''],
     ['ψe (抗震组合系数)', tx(inputs.psiE), ''],
     /* v0.7 —— OOP part 地震参数 */
     ['OOP part coefficient Cp (平面外 part 系数, Table 8.1)', tx(inputs.partResponseCoefficient), ''],
@@ -777,7 +773,7 @@ function InPlaneSeismicBlock({ inputs, inPlane, ResoutOfPlane }) {
       <CalculationFormula caption="Seismic Weight / 地震重力荷载"
         formula={`W_i = G_i + \\sum_{i=1}^{n} \\psi_E Q = ${tx(oopdata.N_GE, 5)}+\\times\\frac{${tx(inputs.Sp)}}{${tx(inplaneseismic.mu)}} = ${tx(inplaneseismic.Cd, 5)}`} />
       <CalculationFormula caption="In-plane base shear / 平面内基底剪力" highlight
-        formula={`V^*_{seismic} = C_d\\,W_t\\,k_d = ${tx(inplaneseismic.Cd, 5)}\\cdot${tx(inplaneseismic.Wt)}\\cdot${tx(inputs.seismicDistributionFactor)} = ${tx(inplaneseismic.Vseismic)}\\,\\mathrm{kN}`} />
+        formula={`V^*_{seismic} = C_d\\,W_i = ${tx(inplaneseismic.Cd, 5)}\\cdot${tx(inplaneseismic.Wt)} + N_dia = ${tx(inplaneseismic.Vseismic)}\\,\\mathrm{kN}`} />
       <CalculationFormula caption="Seismic overturning moment / 抗震倾覆弯矩" highlight
         formula={`M^*_{seismic} = V^*_{seismic}\\,h = (${tx(inplaneseismic.Vseismic)})(${tx(inputs.wallHeight)}) = ${tx(inplaneseismic.Mseismic)}\\,\\mathrm{kN\\cdot m}`} />
     </CalculationSection>

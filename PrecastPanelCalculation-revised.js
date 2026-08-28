@@ -383,8 +383,9 @@ export function calculateInPlaneDesign(input = {}) {
   const Sp = finite( input.structuralPerformanceFactor, 1.3 - 0.3 * mu );
   const Ch = positive(input.spectralShapeFactor);
   const Nt = positive(input.nearFaultFactor, 1);
-  const Wt = positive(input.seismicWeight);
+  // const Wt = positive(input.seismicWeight);
   const NFP = positive(input.period);
+  const PsiE = positive
   const kmu = NFP >= 0.7 ? mu : (mu - 1) * NFP / 0.7 +1
   const CT1 = Ch * Z * Ru * Nt;
   const Cd = CT1 * Sp / kmu;
@@ -513,10 +514,7 @@ export function calculateInPlaneDesign(input = {}) {
         ? Infinity
         : 0;
 
-  const interactionRatio =
-    boundaryNM.available
-      ? boundaryNM.checks.governingUR
-      : 0;
+  const interactionRatio = boundaryNM.available ? boundaryNM.checks.governingUR : 0;
 
   /* ------------------------------------------------------------------------
    * In-plane wall shear.
@@ -596,7 +594,7 @@ export function calculateInPlaneDesign(input = {}) {
       Cd,
       Vseismic,
       Mseismic,
-      Wt,
+      // Wt,
       Z,
       Ru,
       Sp,
