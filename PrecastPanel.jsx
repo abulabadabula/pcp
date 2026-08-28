@@ -615,7 +615,7 @@ function InputSummaryTable({ inputs }) {
     ['Wall width b (墙宽)', tx(inputs.wallWidth), 'm'],
     ['Wall height h (墙高)', tx(inputs.wallHeight), 'm'],
     ['Wall thickness t (墙厚)', tx(inputs.wallThickness), 'm'],
-    ['Concrete density γc (混凝土密度)', tx(inputs.concreteDensity), 'kN/m³'],
+    ['Concrete weight density γc (混凝土密度)', tx(inputs.concreteDensity), 'kN/m³'],
     ["Concrete strength f'c (混凝土强度)", tx(inputs.fc), 'MPa'],
     ['Steel yield fy (钢筋屈服)', tx(inputs.fy), 'MPa'],
     ['Cover (保护层)', tx(inputs.cover, 0), 'mm'],
@@ -635,7 +635,7 @@ function InputSummaryTable({ inputs }) {
     ['Ru (重现期系数)', tx(inputs.returnPeriodFactor), ''],
     ['μ (延性系数)', tx(inputs.ductility), ''],
     ['Sp (结构性能系数)', tx(inputs.structuralPerformanceFactor), ''],
-    ['Ch(T) (场地系数)', tx(inputs.siteCoefficient), ''],
+    ['Ch(T) (反应谱形状系数)', tx(inputs.spectralShapeFactor), ''],
     ['N(T,D) (近断层系数)', tx(inputs.nearFaultFactor), ''],
     ['Wt (抗震重量)', tx(inputs.seismicWeight), 'kN'],
     ['kd (分布系数)', tx(inputs.seismicDistributionFactor), ''],
@@ -720,7 +720,7 @@ function LoadDerivationBlock({ inputs, ResinPlane, ResoutOfPlane }) {
         <CalculationFormula caption="Second moment of area / 惯性矩"
           formula={`I = \\frac{(b\\times1000)^3(t\\times1000)}{12} = \\frac{(${tx(geo.bwall)}\\times1000)^3(${tx(geo.twall)}\\times1000)}{12} = ${tx(geo.I, 0)}\\,\\mathrm{mm^4}`} />
         <CalculationFormula caption="Section modulus / 截面模量"
-          formula={`Z_g = \\frac{(b\\times1000)^2(t\\times1000)}{6} = ${tx(geo.Zg, 0)}\\,\\mathrm{mm^3}`} />
+          formula={`Z_g = \\frac{(b\\times1000)^2(t\\times1000)}{6} = \\frac{(${tx(geo.bwall)}\\times1000)^2(${tx(geo.twall)}\\times1000)}{6}  = ${tx(geo.Zg, 0)}\\,\\mathrm{mm^3}`} />
       </CalculationSubsection>
       <CalculationSubsection title="1.2 Roof pressures → line loads · 屋面压力 → 线荷载 (line load = pressure × Sr)">
         <CalculationFormula caption="Dead line load / 永久荷载线荷载"
@@ -732,25 +732,25 @@ function LoadDerivationBlock({ inputs, ResinPlane, ResoutOfPlane }) {
       </CalculationSubsection>
       <CalculationSubsection title="1.3 In-plane self-weight & gravity ULS · 平面内自重与重力组合">
         <CalculationFormula caption="Wall self-weight / 墙体自重"
-          formula={`G_{wall} = \\gamma_c\\,t\\,h\\,b = (${tx(inputs.concreteDensity)})(${tx(inputs.wallThickness)})(${tx(inputs.wallHeight)})(${tx(inputs.wallWidth)}) = ${tx(inplanegravity.Gwall)}\\,\\mathrm{kN}`} />
+          formula={`G_{wall} = \\gamma_c\\,t\\,h\\,b = ${tx(inputs.concreteDensity)}\\times${tx(inputs.wallThickness)}\\times${tx(inputs.wallHeight)}\\times${tx(inputs.wallWidth)} = ${tx(inplanegravity.Gwall)}\\,\\mathrm{kN}`} />
         <CalculationFormula caption="Total permanent line load / 顶部永久线荷载合计"
-          formula={`G_{line,total} = g_{line}\\times b = (${tx(inplanegravity.gLineLoad)})(${tx(geo.bwall)}) = ${tx(inplanegravity.GlineTotal)}\\,\\mathrm{kN}`} />
+          formula={`G_{line,total} = g_{line}\\times b = ${tx(inplanegravity.gLineLoad)}\\times${tx(geo.bwall)} = ${tx(inplanegravity.GlineTotal)}\\,\\mathrm{kN}`} />
         <CalculationFormula caption="Total imposed line load / 顶部活线荷载合计"
-          formula={`Q_{line,total} = q_{line}\\times b = (${tx(inplanegravity.qLineLoad)})(${tx(geo.bwall)}) = ${tx(inplanegravity.QlineTotal)}\\,\\mathrm{kN}`} />
+          formula={`Q_{line,total} = q_{line}\\times b = ${tx(inplanegravity.qLineLoad)}\\times${tx(geo.bwall)} = ${tx(inplanegravity.QlineTotal)}\\,\\mathrm{kN}`} />
         <CalculationFormula caption="Gravity ULS axial force / 重力 ULS 轴力" highlight
-          formula={`N^*_{gravity} = 1.2(G_{wall}+G_{line,total}) + 1.5\\,Q_{line,total} = 1.2(${tx(inplanegravity.Gwall)}+${tx(inplanegravity.GlineTotal)}) + 1.5(${tx(inplanegravity.QlineTotal)}) = ${tx(inplanegravity.Ngravity)}\\,\\mathrm{kN}`} />
+          formula={`N^*_{gravity} = 1.2(G_{wall}+G_{line,total}) + 1.5\\,Q_{line,total} = 1.2\\times(${tx(inplanegravity.Gwall)}+${tx(inplanegravity.GlineTotal)}) + 1.5\\times(${tx(inplanegravity.QlineTotal)}) = ${tx(inplanegravity.Ngravity)}\\,\\mathrm{kN}`} />
       </CalculationSubsection>
       <CalculationSubsection title="1.4 OOP gravity axial force · 平面外重力轴力">
         <CalculationFormula caption="Roof dead line load / 屋面恒载"
-          formula={`W_d = S_r\\,w_d = (${tx(inputs.Sr)})(${tx(inputs.gUniform)}) = ${tx(oopdata.Wd_line)}\\,\\mathrm{kN/m}`} />
+          formula={`W_d = S_r\\,w_d = ${tx(inputs.Sr)}\\times${tx(inputs.gUniform)} = ${tx(oopdata.Wd_line)}\\,\\mathrm{kN/m}`} />
         <CalculationFormula caption="Wall self-weight above mid-height / 墙体自重（半高以上）"
-          formula={`N_{SW} = \\frac{t_w}{1000}\\cdot\\frac{H_w-t_f}{2}\\cdot\\gamma_c = \\frac{${tx(inputs.wallThickness*1000,0)}}{1000}\\cdot\\frac{${tx(inputs.wallHeight)}-${tx(inputs.tf/1000)}}{2}\\cdot${tx(inputs.concreteDensity)} = ${tx(oopdata.NSW)}\\,\\mathrm{kN/m}`} />
+          formula={`N_{SW} = \\gamma_ct_w\\cdot\\frac{H_w-t_f}{2} = ${tx(inputs.concreteDensity,0)}\\cdot${tx(inputs.wallThickness)}\\cdot\\frac{${tx(inputs.wallHeight,0)}-${tx(inputs.tf,2)}}{2} = ${tx(oopdata.NSW)}\\,\\mathrm{kN/m}`} />
         <CalculationFormula caption="Footing weight / 基础自重"
-          formula={`N_{FF} = L_f\\frac{t_f}{1000}\\gamma_c = ${tx(inputs.Lf,0)}\\frac{${tx(inputs.tf,0)}}{1000}${tx(inputs.concreteDensity)} = ${tx(oopdata.NFF)}\\,\\mathrm{kN/m}`} />
-        <CalculationFormula caption="Slab weight / 楼板自重"
-          formula={`N_{SF} = (L_f+2f_o)\\frac{t_s}{1000}\\gamma_c = (${tx(inputs.Lf,0)}+2\\times${tx(inputs.fo,0)})\\frac{${tx(inputs.ts,0)}}{1000}${tx(inputs.concreteDensity)} = ${tx(oopdata.NSF)}\\,\\mathrm{kN/m}`} />
+          formula={`N_{FF} = \\gamma_cL_ft_f = ${tx(inputs.concreteDensity,0)}\\cdot${tx(inputs.Lf,1)}\\cdot${tx(inputs.tf,1)} = ${tx(oopdata.NFF)}\\,\\mathrm{kN/m}`} />
+        <CalculationFormula caption="Slab weight / 地面板自重"
+          formula={`N_{SF} = \\gamma_c(L_f+2f_o)t_s = ${tx(inputs.concreteDensity,0)}\\cdot(${tx(inputs.Lf,0)}+2\\times${tx(inputs.fo,2)})\\cdot${tx(inputs.ts,2)} = ${tx(oopdata.NSF)}\\,\\mathrm{kN/m}`} />
         <CalculationFormula caption="Hardfill weight / 硬填层自重"
-          formula={`N_{HF} = (L_f+2f_o)\\frac{d_s}{1000}\\gamma_s = (${tx(inputs.Lf,0)}+2\\times${tx(inputs.fo,0)})\\frac{${tx(inputs.ds,0)}}{1000}${tx(inputs.gs)} = ${tx(oopdata.NHF)}\\,\\mathrm{kN/m}`} />
+          formula={`N_{HF} = \\gamma_s(L_f+2f_o)d_s = ${tx(inputs.gs,0)}\\cdot(${tx(inputs.Lf,0)}+2\\times${tx(inputs.fo,2)})\\cdot${tx(inputs.ds,2)} = ${tx(oopdata.NHF)}\\,\\mathrm{kN/m}`} />
         <CalculationFormula caption="Effective gravity axial force / 有效重力轴力" highlight
           formula={`N_{GE} = N_{SW}+N_{FF}+N_{SF}+N_{HF}+W_d = ${tx(oopdata.NSW)}+${tx(oopdata.NFF)}+${tx(oopdata.NSF)}+${tx(oopdata.NHF)}+${tx(oopdata.Wd_line)} = ${tx(oopdata.N_GE)}\\,\\mathrm{kN/m}`} />
         <CalculationFormula caption="ULS gravity envelope / ULS 重力包络"
@@ -763,18 +763,21 @@ function LoadDerivationBlock({ inputs, ResinPlane, ResoutOfPlane }) {
 /* ---------------------------------------------------------------------------
    2. In-Plane Seismic Action（平面内抗震作用）
 --------------------------------------------------------------------------- */
-function InPlaneSeismicBlock({ inputs, inPlane }) {
+function InPlaneSeismicBlock({ inputs, inPlane, ResoutOfPlane }) {
   const inplaneseismic = inPlane.seismic || {};
+  const oopdata = ResoutOfPlane || {};
   return (
     <CalculationSection number="2" title="In-Plane Seismic Action · 平面内抗震作用" chip={<Chip size="small" label="AS/NZS 1170.5 §3.2.2" />}>
       <CalculationFormula caption="Elastic site hazard coefficient / 弹性场地危险系数"
-        formula={`C(T) = C_h(T)\\,Z\\,R_u\\,N(T,D) = (${tx(inplaneseismic.Ch)})(${tx(inplaneseismic.Z)})(${tx(inplaneseismic.Ru)})(${tx(inplaneseismic.Nt)}) = ${tx(inplaneseismic.C, 5)}`} />
-      <CalculationFormula caption="Structural performance factor / 结构性能系数"
-        formula={`S_p = 1.3 - 0.3\\mu = 1.3 - 0.3(${tx(inplaneseismic.mu)}) = ${tx(inplaneseismic.Sp)}`} />
-      <CalculationFormula caption="Design action coefficient / 设计作用系数"
-        formula={`C_d(T) = C(T)\\frac{S_p}{\\mu} = ${tx(inplaneseismic.C, 5)}\\times\\frac{${tx(inplaneseismic.Sp)}}{${tx(inplaneseismic.mu)}} = ${tx(inplaneseismic.Cd, 5)}`} />
+        formula={`C(T_1) = C_h(T_1)\\,Z\\,R_u\\,N(T,D) = (${tx(inplaneseismic.Ch)})(${tx(inplaneseismic.Z)})(${tx(inplaneseismic.Ru)})(${tx(inplaneseismic.Nt)}) = ${tx(inplaneseismic.C, 5)}`} />
+      <CalculationFormula caption="Structural performance factor ULS / 结构性能系数"
+        formula={`S_p = 1.3 - 0.3\\mu = 1.3 - 0.3\\cdot${tx(inplaneseismic.mu)} = ${tx(inplaneseismic.Sp)}`} />
+      <CalculationFormula caption="Design action coefficient ULS / 设计作用系数"
+        formula={`C_d(T_1) = \\frac{C(T_1)S_p}{k_\\mu} = ${tx(inplaneseismic.C, 5)}\\times\\frac{${tx(inplaneseismic.Sp)}}{${tx(inplaneseismic.mu)}} = ${tx(inplaneseismic.Cd, 5)}`} />
+      <CalculationFormula caption="Seismic Weight / 地震重力荷载"
+        formula={`W_i = G_i + \\sum_{i=1}^{n} \\psi_E Q = ${tx(oopdata.N_GE, 5)}+\\times\\frac{${tx(inputs.Sp)}}{${tx(inplaneseismic.mu)}} = ${tx(inplaneseismic.Cd, 5)}`} />
       <CalculationFormula caption="In-plane base shear / 平面内基底剪力" highlight
-        formula={`V^*_{seismic} = C_d\\,W_t\\,k_d = (${tx(inplaneseismic.Cd, 5)})(${tx(inplaneseismic.Wt)}\\,\\mathrm{kN})(${tx(inputs.seismicDistributionFactor)}) = ${tx(inplaneseismic.Vseismic)}\\,\\mathrm{kN}`} />
+        formula={`V^*_{seismic} = C_d\\,W_t\\,k_d = ${tx(inplaneseismic.Cd, 5)}\\cdot${tx(inplaneseismic.Wt)}\\cdot${tx(inputs.seismicDistributionFactor)} = ${tx(inplaneseismic.Vseismic)}\\,\\mathrm{kN}`} />
       <CalculationFormula caption="Seismic overturning moment / 抗震倾覆弯矩" highlight
         formula={`M^*_{seismic} = V^*_{seismic}\\,h = (${tx(inplaneseismic.Vseismic)})(${tx(inputs.wallHeight)}) = ${tx(inplaneseismic.Mseismic)}\\,\\mathrm{kN\\cdot m}`} />
     </CalculationSection>
@@ -1355,7 +1358,7 @@ function CalculationTab({ inputs, results }) {
         <InputSummaryTable inputs={inputs} />
       </CalculationSection>
       <LoadDerivationBlock inputs={inputs} ResinPlane={ResultInPlane} ResoutOfPlane={ResultOutOfPlane} />
-      <InPlaneSeismicBlock inputs={inputs} inPlane={ResultInPlane} />
+      <InPlaneSeismicBlock inputs={inputs} inPlane={ResultInPlane} ResoutOfPlane={ResultOutOfPlane}/>
       <InPlaneActionsBlock inputs={inputs} inPlane={ResultInPlane} />
       <InPlaneChecksBlock inputs={inputs} inPlane={ResultInPlane} />
       <OutOfPlaneBlock inputs={inputs} outOfPlane={ResultOutOfPlane} />
@@ -1608,7 +1611,7 @@ export default function PrecastPanel() {
     ductility: safe(inputs.ductility),
     structuralPerformanceFactor: safe(inputs.structuralPerformanceFactor),
     period: safe(inputs.period),
-    siteCoefficient: safe(inputs.siteCoefficient),
+    spectralShapeFactor: safe(inputs.spectralShapeFactor),
     nearFaultFactor: safe(inputs.nearFaultFactor),
     seismicWeight: safe(inputs.seismicWeight),
     seismicDistributionFactor: safe(inputs.seismicDistributionFactor),

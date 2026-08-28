@@ -370,9 +370,7 @@ export function calculateInPlaneDesign(input = {}) {
   const QlineTotal = qLineLoad * bwall;
 
   /* Gravity-only ULS */
-  const Ngravity =
-    1.2 * (Gwall + GlineTotal) +
-    1.5 * QlineTotal;
+  const Ngravity = 1.2 * (Gwall + GlineTotal) + 1.5 * QlineTotal;
 
   /* ------------------------------------------------------------------------
    * In-plane seismic action.
@@ -383,16 +381,16 @@ export function calculateInPlaneDesign(input = {}) {
   const Ru = positive(input.returnPeriodFactor, 1);
   const mu = Math.max( positive(input.ductility, 1), 1);
   const Sp = finite( input.structuralPerformanceFactor, 1.3 - 0.3 * mu );
-  const Ch = positive(input.siteCoefficient);
+  const Ch = positive(input.spectralShapeFactor);
   const Nt = positive(input.nearFaultFactor, 1);
   const Wt = positive(input.seismicWeight);
-  const C = Ch * Z * Ru * Nt;
-  const Cd = C * Sp / mu;
+  const NFP = positive(input.period);
+  const kmu = NFP >= 0.7 ? mu : (mu - 1) * NFP / 0.7 +1
+  const CT1 = Ch * Z * Ru * Nt;
+  const Cd = CT1 * Sp / kmu;
+  console.log("CT1, CdT1:", CT1, Cd )
 
-  const Vseismic = Cd * Wt *
-    positive( input.seismicDistributionFactor, 1 );
-
-  const Mseismic = Vseismic * hwall;
+  // const Vseismic = Cd * Wt * positive( input.seismicDistributionFactor, 1 );
 
   /* Diaphragm forces: act at wall top, produce moment = F × h */
   const VdiaphragmWind = diaphragmWindForce;
@@ -402,7 +400,10 @@ export function calculateInPlaneDesign(input = {}) {
 
   /* Gravity + seismic */
   const psiE = positive(input.psiE, 0.30);
-  const seismicGravity = Gwall + GlineTotal +  psiE * QlineTotal;
+  const Gi = Gwall + GlineTotal;
+  const seismicGravity = Gi + psiE * QlineTotal;
+  const Vseismic = Cd * seismicGravity
+  const Mseismic = Vseismic * hwall;
   const NseismicCompression = seismicGravity + lintelReaction;
   const NseismicTension = seismicGravity - lintelReaction;
 
@@ -421,21 +422,14 @@ export function calculateInPlaneDesign(input = {}) {
    * Elastic section stresses.
    * ---------------------------------------------------------------------- */
 
-  const sigmaN = Ag > 0
-      ? kNToN(NseismicCompression) / Ag
-      : 0;
+  const sigmaN = Ag > 0 ? kNToN(NseismicCompression) / Ag : 0;
 
-  const sigmaM = Zg > 0
-      ? kNmToNmm(Mtotal) / Zg
-      : 0;
+  const sigmaM = Zg > 0 ? kNmToNmm(Mtotal) / Zg : 0;
 
   const sigmaMax = sigmaN + sigmaM;
   const sigmaMin = sigmaN - sigmaM;
 
-  const eccentricity =
-    NseismicCompression > 0
-      ? Mtotal / NseismicCompression
-      : 0;
+  const eccentricity = NseismicCompression > 0 ? Mtotal / NseismicCompression : 0;
 
   const kern = bwall / 6;
 
@@ -448,24 +442,16 @@ export function calculateInPlaneDesign(input = {}) {
 
   let wallClassification = 'Intermediate wall';
 
-  if (aspectRatio < 1) {
-    wallClassification = 'Squat wall';
-  } else if (aspectRatio > 2) {
-    wallClassification = 'Slender wall';
-  }
+  if (aspectRatio < 1) { wallClassification = 'Squat wall';
+  } else if (aspectRatio > 2) { wallClassification = 'Slender wall' }
 
   /* ------------------------------------------------------------------------
    * Lintel bearing.
    * ---------------------------------------------------------------------- */
 
-  const bearingArea =
-    (positive(input.bearingWidth) / 1000) *
-    (positive(input.bearingLength) / 1000);
+  const bearingArea = (positive(input.bearingWidth) / 1000) * (positive(input.bearingLength) / 1000);
 
-  const bearingStress = bearingArea > 0
-      ? kNToN(lintelReaction) /
-        (bearingArea * 1e6)
-      : 0;
+  const bearingStress = bearingArea > 0 ? kNToN(lintelReaction) / (bearingArea * 1e6) : 0;
 
   /*
    * Kept as an existing simplified bearing check.
@@ -474,12 +460,7 @@ export function calculateInPlaneDesign(input = {}) {
    */
   const bearingCapacity = 0.6 * Math.sqrt(Math.max(fc, 0));
 
-  const bearingRatio =
-    bearingCapacity > 0
-      ? bearingStress / bearingCapacity
-      : lintelReaction > 0
-        ? Infinity
-        : 0;
+  const bearingRatio = bearingCapacity > 0 ? bearingStress / bearingCapacity : lintelReaction > 0 ? Infinity : 0;
 
   /* ------------------------------------------------------------------------
    * Reinforcement.
@@ -491,45 +472,20 @@ export function calculateInPlaneDesign(input = {}) {
   const HbarSpace = positive(input.HbarSpace);
   const vBarArea = areaBar(VbarDia);
   const hBarArea = areaBar(HbarDia);
-  const nVerticalBars = VbarSpace > 0
-      ? Math.floor(bmm / VbarSpace) + 1
-      : 0;
-  const AsDistributed =
-    nVerticalBars * vBarArea;
-  const rhoVertical =
-    Ag > 0
-      ? AsDistributed / Ag
-      : 0;
-  const AsHorizontalPerM =
-    HbarSpace > 0
-      ? hBarArea * 1000 / HbarSpace
-      : 0;
-  const AsBoundary =
-    positive(input.boundaryBarCount) *
-    areaBar(
-      positive(input.boundaryBarDiameter)
-    );
-  const boundaryArea =
-    positive(input.boundaryWidth) *
-    1000 *
-    positive(
-      input.boundaryThickness,
-      twall
-    ) *
-    1000;
-  const rhoBoundary =
-    boundaryArea > 0
-      ? AsBoundary / boundaryArea
-      : 0;
-  const boundarySteelTensionCapacity =
-    AsBoundary * fy / 1000;
+  const nVerticalBars = VbarSpace > 0 ? Math.floor(bmm / VbarSpace) + 1 : 0;
+  const AsDistributed = nVerticalBars * vBarArea;
+  const rhoVertical = Ag > 0 ? AsDistributed / Ag : 0;
+  const AsHorizontalPerM = HbarSpace > 0 ? hBarArea * 1000 / HbarSpace : 0;
+  const AsBoundary = positive(input.boundaryBarCount) * areaBar( positive(input.boundaryBarDiameter));
+  const boundaryArea = positive(input.boundaryWidth) * 1000 * positive(input.boundaryThickness, twall) * 1000;
+  const rhoBoundary = boundaryArea > 0 ? AsBoundary / boundaryArea : 0;
+  const boundarySteelTensionCapacity = AsBoundary * fy / 1000;
 
   /* ------------------------------------------------------------------------
    * Boundary element N-M.
    * ---------------------------------------------------------------------- */
 
-  const boundaryNM =
-    calculateBoundaryElementNM(input, {
+  const boundaryNM = calculateBoundaryElementNM(input, {
       Gwall,
       GlineTotal,
       QlineTotal,
@@ -545,21 +501,11 @@ export function calculateInPlaneDesign(input = {}) {
    * actual boundary-element N-M result as the governing interaction result
    * when a boundary element exists.
    */
-  const phiPn =
-    boundaryNM.available
-      ? boundaryNM.keyPoints.phiP0
-      : 0;
+  const phiPn = boundaryNM.available ? boundaryNM.keyPoints.phiP0 : 0;
 
-  const phiMn =
-    boundaryNM.available
-      ? boundaryNM.keyPoints.phiM0
-      : 0;
+  const phiMn = boundaryNM.available ? boundaryNM.keyPoints.phiM0 : 0;
 
-  const axialRatio = phiPn > 0
-      ? NseismicCompression / phiPn
-      : boundaryNM.available
-        ? Infinity
-        : 0;
+  const axialRatio = phiPn > 0 ? NseismicCompression / phiPn : boundaryNM.available ? Infinity : 0;
 
   const momentRatio = phiMn > 0
       ? Mtotal / phiMn
@@ -596,19 +542,14 @@ export function calculateInPlaneDesign(input = {}) {
    * spacing. The factor of 2 assumes the same reinforcement is present on
    * both faces, consistent with the existing wall input convention.
    */
-  const AvPerM = VbarSpace > 0
-      ? 2 * vBarArea * 1000 / VbarSpace
-      : 0;
+  const AvPerM = VbarSpace > 0 ? 2 * vBarArea * 1000 / VbarSpace : 0;
 
   const VsProvided = AvPerM * fy * dv / 1000;
 
   const shearCapacity = phiVc + phiShear * VsProvided;
 
-  const shearRatio = shearCapacity > 0
-      ? Vtotal / shearCapacity
-      : Vtotal > 0
-        ? Infinity
-        : 0;
+  const shearRatio = shearCapacity > 0 ? Vtotal / shearCapacity
+      : Vtotal > 0 ? Infinity : 0;
 
   const VsRequiredUnfactored = max0(Vtotal / Math.max(phiShear, 1e-9) - vc);
 
@@ -626,10 +567,7 @@ export function calculateInPlaneDesign(input = {}) {
 
   const bearingPass = Number.isFinite(bearingRatio) && bearingRatio <= 1;
 
-  const interactionPass =
-    boundaryNM.available
-      ? boundaryNM.checks.pass
-      : true;
+  const interactionPass = boundaryNM.available ? boundaryNM.checks.pass : true;
 
   const shearPass = Number.isFinite(shearRatio) && shearRatio <= 1;
 
@@ -654,7 +592,7 @@ export function calculateInPlaneDesign(input = {}) {
     },
 
     seismic: {
-      C,
+      C: CT1,
       Cd,
       Vseismic,
       Mseismic,
@@ -664,7 +602,8 @@ export function calculateInPlaneDesign(input = {}) {
       Sp,
       mu,
       Ch,
-      Nt
+      Nt,
+      Gi,
     },
 
     diaphragm: {
@@ -774,10 +713,10 @@ export function calculateInPlaneDesign(input = {}) {
  * ========================================================================== */
 
 export function calculateOutOfPlaneDesign(input = {}) {
-  /* Unified geometry → OOP variables */
-  const Hw = positive(input.wallHeight) * 1000;
-  const Lw = positive(input.wallWidth) * 1000;
-  const tw = positive(input.wallThickness) * 1000;
+  /* 读入输入数据 */
+  const Hw = positive(input.wallHeight);
+  const Lw = positive(input.wallWidth);
+  const tw = positive(input.wallThickness);
 
   const tf = positive(input.tf);
   const Lf = positive(input.Lf);
@@ -786,16 +725,11 @@ export function calculateOutOfPlaneDesign(input = {}) {
   const ds = positive(input.ds);
 
   /* hroof validation */
-  const {
-    hroofEffective,
-    hroofMax,
-    hroofValid
-  } = validateHroof(input);
-
+  const { hroofEffective,hroofMax,hroofValid} = validateHroof(input);
   const hroof = hroofEffective;
 
-  const gs = positive(input.gs, 18);
-  const gc = positive(input.concreteDensity, 24);
+  const gammaSoil = positive(input.gs, 18);
+  const gammaConcrete = positive(input.concreteDensity, 24);
   const fy = positive(input.fy);
   const fyMesh = positive(input.fyMesh);
   const fc = positive(input.fc);
@@ -812,10 +746,7 @@ export function calculateOutOfPlaneDesign(input = {}) {
   const AsMesh = positive(input.MeshArea);
 
   /* Support conditions（两套独立支承：风/震 与 火灾） */
-  const supportWS =
-    input.supportWindSeismic ||
-    input.outOfPlaneSupportCondition ||
-    'Pinned-Pinned';
+  const supportWS = input.supportWindSeismic || input.outOfPlaneSupportCondition || 'Pinned-Pinned';
 
   const supportFire = input.supportFire || 'Fixed-Free';
 
@@ -856,24 +787,26 @@ export function calculateOutOfPlaneDesign(input = {}) {
   const n = Ec > 0 ? Es / Ec : 0;
 
   /*
-   * One-metre strip:
-   *   Ag = 1000 t
-   *   I  = 1000 t³/12
-   *   Z  = 1000 t²/6
+   * One-metre strip:一米宽条带计算
+   *   Ag = t
+   *   I  = t³/12
+   *   Z  = t²/6
    */
   const Ag = tw * 1000;
-  const d = Math.max( tw / 2 -  cover -  Vbar / 2,  1);
-  const Ig = Math.pow(tw, 3) / 12;
+  // 为啥墙厚取一半？
+  const depthRebar = Math.max( tw *1000 / 2 -  cover -  Vbar / 2,  1);
+  const Ig = Math.pow(tw * 1000, 3) / 12;
   const Iw = Lw * Ig;
   const ZperM = tw > 0 ? Math.pow(tw, 2) / 6 : 0;
   const Z = Lw * ZperM;
-  const AWV = Math.PI * Math.pow(Vbar, 2) / 4 * (1000 / Vspace);
+  const AWV = areaBar(Vbar) / Vspace;
   const AWS = Lw * AWV;
-  const AWH = Math.PI * Math.pow(Hbar, 2) / 4 * (1000 / Hspace);
-  const AWF = Math.PI * Math.pow(Fbar, 2) / 4 * (1000 / Fspace);
+  const AWH = areaBar(Hbar) / Hspace;
+  const AWF = areaBar(Fbar) / Fspace;
   const Tmesh = AsMesh * fyMesh / 1000;
   const rhoV = tw > 0 ? AWV / tw : 0;
   const rhoH = tw > 0 ? AWH / tw : 0;
+
 
   /* ------------------------------------------------------------------------
    * Gravity actions per metre of wall.
@@ -884,14 +817,15 @@ export function calculateOutOfPlaneDesign(input = {}) {
 
   const Wd_line = wd;
   const Wq_line = wq;
-  const wallHeightAboveFooting = Math.max(Hw - tf * 1, 0) / 1000;
-  const NSW = (tw / 1000) * wallHeightAboveFooting * gc;
-  const NFF = Math.max(Lf, 0) * (tf / 1000) * gc;
+  const wallHeightAboveFooting = Math.max(Hw - tf * 1, 0);
+  const NSW = tw * wallHeightAboveFooting * gammaConcrete / 2;
+  const NFF = Math.max(Lf, 0) * tf * gammaConcrete;
   const slabWidth = Math.max( Lf + 2 * fo, 0);
-  const NSF = slabWidth * (ts / 1000) * gc;
-  const NHF = slabWidth * (ds / 1000) * gs;
+  const NSF = slabWidth * ts * gammaConcrete;
+  const NHF = slabWidth * ds * gammaSoil;
   const N_GE = NSW + NFF + NSF + NHF + Wd_line;
   const Nmax = Math.max(1.35 * N_GE, 1.2 * N_GE + 1.5 * Wq_line);
+  console.log("wd,wq,wallheighabovefooting,NSW,NFF,NSF,NHF",wd,wq,wallHeightAboveFooting,NSW,NFF,NSF,NHF)
 
   /* ------------------------------------------------------------------------
    * Part/component seismic action.
@@ -923,7 +857,7 @@ export function calculateOutOfPlaneDesign(input = {}) {
    * 此处待检查!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    */
   const partH = partHn > 0 ? 1 + 2 * Math.min(partHx / partHn, 1) : 1;
-  const Wp_panel = gc * (tw / 1000) * hroof;
+  const Wp_panel = gammaConcrete * (tw / 1000) * hroof;
   const Fp_panel = partCp * partH *  Wp_panel;
 
   const WE_T1 = hroof > 0 ? Fp_panel / hroof : 0;
@@ -998,10 +932,10 @@ export function calculateOutOfPlaneDesign(input = {}) {
 
   const c = a / 0.85;
 
-  const k = d > 0 ? a / (0.85 * d) : 0;
+  const k = depthRebar > 0 ? a / (0.85 * depthRebar) : 0;
 
-  const phiMn = 0.85 * AWV * fy * Math.max( d - a / 2, 0) / 1e6;
-  console.log("phiMn:",phiMn,AWV, fy, d, a)
+  const phiMn = 0.85 * AWV * fy * Math.max( depthRebar - a / 2, 0) / 1e6;
+  console.log("phiMn:",phiMn,AWV, fy, depthRebar, a)
 
   /*
    * NZS 3101-style approximate cracked inertia:
@@ -1010,7 +944,7 @@ export function calculateOutOfPlaneDesign(input = {}) {
    */
   const Ase = fy > 0 ? Math.max( (Na * 1000 + AWV * fy) / fy, 0) : 0;
 
-  const Icr = n * Ase * Math.pow( d - k * d, 2) + 1000 * Math.pow( Math.max(k * d, 0), 3) / 3;
+  const Icr = n * Ase * Math.pow( depthRebar - k * depthRebar, 2) + 1000 * Math.pow( Math.max(k * depthRebar, 0), 3) / 3;
 
   const pDeltaDen = 0.75 * 48 * Ec * Icr;
 
@@ -1039,100 +973,33 @@ export function calculateOutOfPlaneDesign(input = {}) {
    * Fire.
    * ---------------------------------------------------------------------- */
 
-  const hs =
-    Math.max(
-      (
-        Hw -
-        tf * 1 -
-        ds * 1 -
-        ts * 1
-      ) / 1000,
-      0
-    );
+  const hs = Math.max((Hw - tf * 1 - ds * 1 - ts * 1) / 1000, 0);
 
-  const xt =
-    Math.max(
-      tw / 2 -
-      Vbar / 2 -
-      Hbar,
-      0.001
-    );
+  const xt = Math.max(tw / 2 - Vbar / 2 - Hbar, 0.001);
 
-  const etax =
-    0.16 *
-      Math.log(
-        Math.max(th, 0.001) *
-        Math.pow(
-          xt / 1000,
-          -2
-        )
-      ) -
-    0.65;
+  const etax = 0.16 * Math.log(Math.max(th, 0.001) * Math.pow(xt / 1000, -2)) - 0.65;
 
-  const etaw =
-    1 -
-    0.162 *
-      Math.pow(
-        Math.max(th, 0.001),
-        -0.6
-      );
+  const etaw = 1 - 0.162 * Math.pow(Math.max(th, 0.001), -0.6);
 
-  const Tf =
-    660;
+  const Tf = 660;
 
-  const Tfs =
-    etax *
-    etaw *
-    Tf;
+  const Tfs = etax * etaw * Tf;
 
-  const fyt =
-    Math.min(
-      Math.max(
-        ((720 - Tfs) / 470) * fy,
-        0
-      ),
-      fy
-    );
+  const fyt = Math.min( Math.max(((720 - Tfs) / 470) * fy, 0),fy);
 
-  const Ts_fire =
-    AWS * fyt / 1000;
+  const Ts_fire = AWS * fyt / 1000;
 
-  const a_fireDen =
-    0.85 *
-    fc *
-    1000;
+  const a_fireDen = 0.85 * fc * 1000;
 
-  const a_fire =
-    a_fireDen > 0
-      ? Ts_fire * 1000 / a_fireDen
-      : 0;
+  const a_fire = a_fireDen > 0 ? Ts_fire * 1000 / a_fireDen : 0;
 
-  const phiMn_fire =
-    0.85 *
-    AWV *
-    fyt *
-    Math.max(
-      d - a_fire / 2,
-      0
-    ) /
-    1e6;
+  const phiMn_fire = 0.85 * AWV * fyt * Math.max(depthRebar - a_fire / 2, 0) / 1e6;
 
-  const fireSpan =
-    Math.max(
-      (Hw - tf) / 1000,
-      0
-    );
+  const fireSpan = Math.max((Hw - tf) / 1000, 0);
 
-  const Mbf =
-    wf *
-    fireSpan *
-    fireSpan *
-    fireFactors.base;
+  const Mbf = wf * fireSpan * fireSpan * fireFactors.base;
 
-  const UR3 =
-    phiMn_fire > 0
-      ? Mbf / phiMn_fire
-      : Infinity;
+  const UR3 = phiMn_fire > 0 ? Mbf / phiMn_fire : Infinity;
 
   /* ------------------------------------------------------------------------
    * OOP shear.
@@ -1142,66 +1009,25 @@ export function calculateOutOfPlaneDesign(input = {}) {
    * remains the reinforcement used for this OOP shear contribution.
    * ---------------------------------------------------------------------- */
 
-  const VE_T1 =
-    (5 / 8) *
-    WE *
-    fireSpan;
+  const VE_T1 = (5 / 8) * WE * fireSpan;
 
-  const VE_TE =
-    VE_T1;
+  const VE_TE = VE_T1;
 
-  const VE =
-    Math.max(
-      VE_T1,
-      VE_TE
-    ) +
-    F_add;
+  const VE = Math.max( VE_T1, VE_TE) + F_add;
 
-  const Vw =
-    (5 / 8) *
-    WindPressure *
-    fireSpan +
-    F_add;
+  const Vw = (5 / 8) * WindPressure * fireSpan + F_add;
 
-  const vc1 =
-    0.25 *
-      Math.sqrt(
-        Math.max(fc, 0)
-      ) +
-    (
-      Ag > 0
-        ? Na / (4 * Ag)
-        : 0
-    );
+  const vc1 = 0.25 * Math.sqrt(Math.max(fc, 0)) + ( Ag > 0 ? Na / (4 * Ag) : 0);
 
-  const Vc =
-    vc1 *
-    d /
-    1000;
+  const Vc = vc1 * depthRebar / 1000;
 
-  const Vs =
-    AWH *
-    fy *
-    d /
-    Hspace /
-    1000;
+  const Vs = AWH * fy * depthRebar / Hspace / 1000;
 
-  const phiVw =
-    0.75 *
-    (Vc + Vs);
+  const phiVw = 0.75 * (Vc + Vs);
 
-  const Vprime =
-    Math.max(
-      VE,
-      Vw
-    );
+  const Vprime = Math.max( VE, Vw);
 
-  const UR4 =
-    phiVw > 0
-      ? Vprime / phiVw
-      : Vprime > 0
-        ? Infinity
-        : 0;
+  const UR4 = phiVw > 0 ? Vprime / phiVw : Vprime > 0 ? Infinity : 0;
 
   /* ------------------------------------------------------------------------
    * Foundation for OOP overturning.
@@ -1340,7 +1166,7 @@ export function calculateOutOfPlaneDesign(input = {}) {
     Ec,
     n,
     Ag,
-    d,
+    d: depthRebar,
     Ig,
     Iw,
     Z,

@@ -70,11 +70,11 @@ export const INPUT_SECTIONS = [
     id: 'oopGeometry',
     title: '2. OOP Geometry (Footing / Slab / Hardfill)',
     fields: [
-      { key: 'tf', label: 'Footing Thickness (tf)', unit: 'mm', step: '10', min: '0' },
-      { key: 'Lf', label: 'Footing Length (Lf)', unit: 'mm', step: '100', min: '0' },
-      { key: 'ts', label: 'Slab Thickness (ts)', unit: 'mm', step: '10', min: '0' },
-      { key: 'fo', label: 'Footing Overhang (fo)', unit: 'mm', step: '10', min: '0' },
-      { key: 'ds', label: 'Hardfill Thickness (ds)', unit: 'mm', step: '10', min: '0' },
+      { key: 'tf', label: 'Footing Thickness (tf)', unit: 'm', step: '0.01', min: '0' },
+      { key: 'Lf', label: 'Footing Length (Lf)', unit: 'm', step: '0.1', min: '0' },
+      { key: 'ts', label: 'Slab Thickness (ts)', unit: 'm', step: '0.01', min: '0' },
+      { key: 'fo', label: 'Footing Overhang (fo)', unit: 'm', step: '0.01', min: '0' },
+      { key: 'ds', label: 'Hardfill Thickness (ds)', unit: 'm', step: '0.05', min: '0' },
       { key: 'hroof', label: 'Height to Roof (hroof)', unit: 'm', step: '0.1', min: '0' }
     ]
   },
@@ -82,7 +82,7 @@ export const INPUT_SECTIONS = [
     id: 'materials',
     title: '3. Material Properties (Shared)',
     fields: [
-      { key: 'concreteDensity', label: 'Concrete Density (γc)', unit: 'kN/m³', step: '0.5', min: '15' },
+      { key: 'concreteDensity', label: 'Concrete Weight Density (γc)', unit: 'kN/m³', step: '0.5', min: '15' },
       { key: 'fc', label: "Concrete Strength f'c", unit: 'MPa', step: '1', min: '15' },
       { key: 'fy', label: 'Steel Yield (fy)', unit: 'MPa', step: '5', min: '250' },
       { key: 'fyMesh', label: 'Mesh Yield (fyMesh)', unit: 'MPa', step: '1', min: '0' },
@@ -137,12 +137,12 @@ export const INPUT_SECTIONS = [
       { key: 'hazardFactor', label: 'Hazard Factor Z', unit: '', step: '0.01', min: '0' },
       { key: 'returnPeriodFactor', label: 'Return Period Factor Ru', unit: '', step: '0.01', min: '0' },
       { key: 'ductility', label: 'Ductility Factor μ', unit: '', step: '0.05', min: '1' },
-      { key: 'siteCoefficient', label: 'Site Coefficient Ch(T)', unit: '', step: '0.01', min: '0' },
+      { key: 'spectralShapeFactor', label: 'Site Coefficient Ch(T)', unit: '', step: '0.01', min: '0' },
       { key: 'nearFaultFactor', label: 'Near-Fault Factor N(T,D)', unit: '', step: '0.01', min: '0' },
       { key: 'period', label: 'Fundamental Period T', unit: 's', step: '0.01', min: '0.01' },
-      { key: 'seismicWeight', label: 'Tributary Seismic Weight', unit: 'kN', step: '1', min: '0' },
-      { key: 'seismicDistributionFactor', label: 'Wall Distribution Factor', unit: '', step: '0.01', min: '0' },
-      { key: 'psiE', label: 'Seismic Combination ψe', unit: '', step: '0.05', min: '0' },
+      // { key: 'seismicWeight', label: 'Tributary Seismic Weight', unit: 'kN', step: '1', min: '0' },
+      // { key: 'seismicDistributionFactor', label: 'Wall Distribution Factor', unit: '', step: '0.01', min: '0' },
+      { key: 'psiE', label: 'Seismic Combination ψe', unit: '', step: '0.3', min: '0.3' },
     ]
   },
   {
@@ -264,11 +264,11 @@ export const DEFAULT_INPUTS = {
   hroof must satisfy: hroof ≤ wallHeight - tf/1000 - ds/1000 - ts/1000
   Default: 4.0 - 0.3 - 0.15 - 0.15 = 3.4
   ------------------------------------------------------------------------ */
-  tf: 300,
-  Lf: 1800,
-  ts: 150,
-  fo: 50,
-  ds: 150,
+  tf: 0.3,
+  Lf: 1.8,
+  ts: 0.15,
+  fo: 0.05,
+  ds: 0.15,
   hroof: 3.4,
 
   /* --------------------------------------------------------------------------
@@ -335,17 +335,17 @@ export const DEFAULT_INPUTS = {
       Wp = γc × tw × hroof（每延米墙板重量，由引擎自动计算）
   旧的 OOP 系数输入 CdT1 / CdTE 已在 v0.6 移除。
   ------------------------------------------------------------------------ */
-  subsoilClass: 'D',
+  subsoilClass: 'C',
   importanceLevel: 'IL2',
   hazardFactor: 0.13,
   returnPeriodFactor: 1.0,
   ductility: 1.25,
   structuralPerformanceFactor: 1.3 - 0.3 * 1.25,
   period: 0.40,
-  siteCoefficient: 1.70,
+  spectralShapeFactor: 2.36,
   nearFaultFactor: 1.0,
-  seismicWeight: 150,
-  seismicDistributionFactor: 1.0,
+  // seismicWeight: 150,
+  // seismicDistributionFactor: 1.0,
   psiE: 0.30,
   /* v0.6 —— AS/NZS 1170.5 Chapter 8 part 参数 */
   partResponseCoefficient: 0.75,
