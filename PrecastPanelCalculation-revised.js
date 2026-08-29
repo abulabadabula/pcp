@@ -221,28 +221,22 @@ export function calculateBoundaryElementNM(input = {}, ctx = {}) {
    * Do not silently return a positive capacity for N outside the curve.
    */
   const momentCapacityAt = (Nd) => {
-    if (!Number.isFinite(Nd) || curveDesign.length === 0) {
-      return 0;
-    }
+    if (!Number.isFinite(Nd) || curveDesign.length === 0) { return 0 }
 
-    if (Nd > curveDesign[0].N + 1e-9) {
-      return 0;
-    }
+    if (Nd > curveDesign[0].N + 1e-9) { return 0 }
 
     for (let i = 0; i + 1 < curveDesign.length; i += 1) {
       const p1 = curveDesign[i];
       const p2 = curveDesign[i + 1];
 
       if (Nd <= p1.N && Nd >= p2.N) {
-        const denominator =
-          p1.N - p2.N;
+        const denominator = p1.N - p2.N;
 
         if (Math.abs(denominator) < 1e-9) {
           return Math.min(p1.M, p2.M);
         }
 
-        const ratio =
-          (p1.N - Nd) / denominator;
+        const ratio = (p1.N - Nd) / denominator;
 
         return p1.M + ratio * (p2.M - p1.M);
       }
@@ -385,13 +379,10 @@ export function calculateInPlaneDesign(input = {}) {
   const Nt = positive(input.nearFaultFactor, 1);
   // const Wt = positive(input.seismicWeight);
   const NFP = positive(input.period);
-  const PsiE = positive
   const kmu = NFP >= 0.7 ? mu : (mu - 1) * NFP / 0.7 +1
   const CT1 = Ch * Z * Ru * Nt;
   const Cd = CT1 * Sp / kmu;
   console.log("CT1, CdT1:", CT1, Cd )
-
-  // const Vseismic = Cd * Wt * positive( input.seismicDistributionFactor, 1 );
 
   /* Diaphragm forces: act at wall top, produce moment = F × h */
   const VdiaphragmWind = diaphragmWindForce;
@@ -403,7 +394,7 @@ export function calculateInPlaneDesign(input = {}) {
   const psiE = positive(input.psiE, 0.30);
   const Gi = Gwall + GlineTotal;
   const seismicGravity = Gi + psiE * QlineTotal;
-  const Vseismic = Cd * seismicGravity
+  const Vseismic = Cd * seismicGravity;
   const Mseismic = Vseismic * hwall;
   const NseismicCompression = seismicGravity + lintelReaction;
   const NseismicTension = seismicGravity - lintelReaction;
@@ -412,10 +403,7 @@ export function calculateInPlaneDesign(input = {}) {
   const Mlintel = lintelReaction * lintelEcc;
 
   /* Total actions: seismic + diaphragm + lintel */
-  const Mtotal = Mseismic + Math.max(
-      MdiaphragmWind,
-      MdiaphragmSeismic
-    ) + Mlintel;
+  const Mtotal = Mseismic + Math.max( MdiaphragmWind, MdiaphragmSeismic) + Mlintel;
 
   const Vtotal = Vseismic +  Math.max( VdiaphragmWind, VdiaphragmSeismic);
 
@@ -508,11 +496,7 @@ export function calculateInPlaneDesign(input = {}) {
 
   const axialRatio = phiPn > 0 ? NseismicCompression / phiPn : boundaryNM.available ? Infinity : 0;
 
-  const momentRatio = phiMn > 0
-      ? Mtotal / phiMn
-      : boundaryNM.available
-        ? Infinity
-        : 0;
+  const momentRatio = phiMn > 0 ? Mtotal / phiMn : boundaryNM.available ? Infinity : 0;
 
   const interactionRatio = boundaryNM.available ? boundaryNM.checks.governingUR : 0;
 
@@ -592,9 +576,10 @@ export function calculateInPlaneDesign(input = {}) {
     seismic: {
       C: CT1,
       Cd,
+      seismicGravity,
       Vseismic,
       Mseismic,
-      // Wt,
+      psiE,
       Z,
       Ru,
       Sp,

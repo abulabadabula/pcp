@@ -761,21 +761,21 @@ function LoadDerivationBlock({ inputs, ResinPlane, ResoutOfPlane }) {
 --------------------------------------------------------------------------- */
 function InPlaneSeismicBlock({ inputs, inPlane, ResoutOfPlane }) {
   const inplaneseismic = inPlane.seismic || {};
-  const oopdata = ResoutOfPlane || {};
+  const gravity = inPlane.gravity || {};
   return (
     <CalculationSection number="2" title="In-Plane Seismic Action · 平面内抗震作用" chip={<Chip size="small" label="AS/NZS 1170.5 §3.2.2" />}>
       <CalculationFormula caption="Elastic site hazard coefficient / 弹性场地危险系数"
-        formula={`C(T_1) = C_h(T_1)\\,Z\\,R_u\\,N(T,D) = (${tx(inplaneseismic.Ch)})(${tx(inplaneseismic.Z)})(${tx(inplaneseismic.Ru)})(${tx(inplaneseismic.Nt)}) = ${tx(inplaneseismic.C, 5)}`} />
+        formula={`C(T_1) = C_h(T_1)\\,Z\\,R_u\\,N(T,D) = ${tx(inplaneseismic.Ch)}\\times${tx(inplaneseismic.Z)}\\times${tx(inplaneseismic.Ru)}\\times${tx(inplaneseismic.Nt)} = ${tx(inplaneseismic.C, 5)}`} />
       <CalculationFormula caption="Structural performance factor ULS / 结构性能系数"
-        formula={`S_p = 1.3 - 0.3\\mu = 1.3 - 0.3\\cdot${tx(inplaneseismic.mu)} = ${tx(inplaneseismic.Sp)}`} />
+        formula={`S_p = 1.3 - 0.3\\mu = 1.3 - 0.3\\times${tx(inplaneseismic.mu)} = ${tx(inplaneseismic.Sp)}`} />
       <CalculationFormula caption="Design action coefficient ULS / 设计作用系数"
-        formula={`C_d(T_1) = \\frac{C(T_1)S_p}{k_\\mu} = ${tx(inplaneseismic.C, 5)}\\times\\frac{${tx(inplaneseismic.Sp)}}{${tx(inplaneseismic.mu)}} = ${tx(inplaneseismic.Cd, 5)}`} />
+        formula={`C_d(T_1) = \\frac{C(T_1)S_p}{k_\\mu} = ${tx(inplaneseismic.C, 4)}\\times\\frac{${tx(inplaneseismic.Sp)}}{${tx(inplaneseismic.mu)}} = ${tx(inplaneseismic.Cd, 4)}`} />
       <CalculationFormula caption="Seismic Weight / 地震重力荷载"
-        formula={`W_i = G_i + \\sum_{i=1}^{n} \\psi_E Q = ${tx(oopdata.N_GE, 5)}+\\times\\frac{${tx(inputs.Sp)}}{${tx(inplaneseismic.mu)}} = ${tx(inplaneseismic.Cd, 5)}`} />
+        formula={`W_i = G_i + \\sum_{i=1}^{n} \\psi_E Q = ${tx(gravity.Gwall, 2)}+${tx(gravity.GlineTotal, 2)}+${tx(inplaneseismic.psiE)}\\times${tx(gravity.QlineTotal)} = ${tx(inplaneseismic.seismicGravity)}\\mathrm{kN}`} />
       <CalculationFormula caption="In-plane base shear / 平面内基底剪力" highlight
-        formula={`V^*_{seismic} = C_d\\,W_i = ${tx(inplaneseismic.Cd, 5)}\\cdot${tx(inplaneseismic.Wt)} + N_dia = ${tx(inplaneseismic.Vseismic)}\\,\\mathrm{kN}`} />
+        formula={`V^*_{seismic} = C_d\\,W_i = ${tx(inplaneseismic.Cd, 4)}\\times${tx(inplaneseismic.seismicGravity)} = ${tx(inplaneseismic.Vseismic)}\\,\\mathrm{kN}`} />
       <CalculationFormula caption="Seismic overturning moment / 抗震倾覆弯矩" highlight
-        formula={`M^*_{seismic} = V^*_{seismic}\\,h = (${tx(inplaneseismic.Vseismic)})(${tx(inputs.wallHeight)}) = ${tx(inplaneseismic.Mseismic)}\\,\\mathrm{kN\\cdot m}`} />
+        formula={`M^*_{seismic} = V^*_{seismic}\\,h = ${tx(inplaneseismic.Vseismic)}\\times${tx(inputs.wallHeight)} = ${tx(inplaneseismic.Mseismic)}\\,\\mathrm{kN\\cdot m}`} />
     </CalculationSection>
   );
 }
@@ -791,7 +791,7 @@ function InPlaneActionsBlock({ inputs, inPlane }) {
   const diaM = Math.max(safe(diaphragm.MdiaphragmWind), safe(diaphragm.MdiaphragmSeismic));
   return (
     <CalculationSection number="3" title="Combined In-Plane Actions · 平面内组合内力" chip={<Chip size="small" label="Seismic + Diaphragm + Lintel" />}>
-      <CalculationSubsection title="3.1 Roof diaphragm forces · 屋盖隔膜力 (at wall top)">
+      <CalculationSubsection title="3.1 Roof diaphragm horizontal forces · 屋盖隔膜水平传力 (at wall top)">
         <CalculationFormula caption="Envelope diaphragm force / 隔膜水平力包络"
           formula={`V_{dia} = \\max(V_{wd},\\,V_{es}) = \\max(${tx(diaphragm.VdiaphragmWind)},\\,${tx(diaphragm.VdiaphragmSeismic)}) = ${tx(diaV)}\\,\\mathrm{kN}`} />
         <CalculationFormula caption="Diaphragm moment at base / 隔膜底部弯矩"
@@ -799,14 +799,14 @@ function InPlaneActionsBlock({ inputs, inPlane }) {
       </CalculationSubsection>
       <CalculationSubsection title="3.2 Lintel reaction & eccentricity · 过梁反力与偏心">
         <CalculationFormula caption="Lintel eccentric moment / 过梁偏心弯矩"
-          formula={`M_{lintel} = R_{lintel}\\,e = (${tx(inputs.lintelReaction)}\\,\\mathrm{kN})(${tx(inputs.lintelEccentricity)}\\,\\mathrm{m}) = ${tx(sectionactions.Mlintel)}\\,\\mathrm{kN\\cdot m}`} />
+          formula={`M_{lintel} = R_{lintel}\\,e = ${tx(inputs.lintelReaction)}\\times${tx(inputs.lintelEccentricity)} = ${tx(sectionactions.Mlintel)}\\,\\mathrm{kN\\cdot m}`} />
       </CalculationSubsection>
-      <CalculationSubsection title="3.3 Axial forces & total actions · 轴力与总内力">
+      <CalculationSubsection title="3.3 Gravity forces & total actions · 轴力与总内力">
         <CalculationFormula caption="Seismic gravity axial force / 抗震重力组合轴力"
-          formula={`N_{EQ,g} = G_{wall}+G_{line,total}+\\psi_e Q_{line,total} = ${tx(sectionactions.seismicGravity)}\\,\\mathrm{kN}`} />
-        <CalculationFormula caption="Compression case / 受压工况轴力" highlight
+          formula={`N_{EQ,g} = G_{wall}+G_{line,total}+\\psi_E Q_{line,total} = ${tx(sectionactions.seismicGravity)}\\,\\mathrm{kN}`} />
+        <CalculationFormula caption="Compression end axial force / 受压端的轴力" highlight
           formula={`N^*_{comp} = N_{EQ,g}+R_{lintel} = ${tx(sectionactions.seismicGravity)}+${tx(inputs.lintelReaction)} = ${tx(sectionactions.NseismicCompression)}\\,\\mathrm{kN}`} />
-        <CalculationFormula caption="Opposite direction axial force / 反向抗震轴力"
+        <CalculationFormula caption="Tension end axial force / 受拉端的轴力"
           formula={`N^*_{tension} = N_{EQ,g}-R_{lintel} = ${tx(sectionactions.seismicGravity)}-${tx(inputs.lintelReaction)} = ${tx(sectionactions.NseismicTension)}\\,\\mathrm{kN}`}
           status={mkStatus(safe(sectionactions.NseismicTension) >= 0, 'COMPRESSION', 'TENSION / UPLIFT')} />
         <CalculationFormula caption="Total in-plane moment / 总弯矩" highlight
@@ -1331,19 +1331,7 @@ function CalculationTab({ inputs, results }) {
   return (
     <Box>
       <Alert severity="info" sx={{ mb: 2 }}>
-        Calculation steps displayed in sectional KaTeX blocks. Engine: PrecastPanelCalculation v0.6.2.
-        In-plane aligned with PanelWallInPlaneDesign.jsx; OOP aligned with PrecastPanelOOPDesign.jsx
-        (support condition coefficients applied); Connection and In-Plane Foundation are v0.5 additions.
-        v0.6: OOP seismic action now follows AS/NZS 1170.5:2004 Chapter 8 (parts): Fp = Cp × H × Wp
-        (replaces the former CdT1/CdTE coefficient inputs).
-        v0.6.2: Boundary element local N-M interaction check added for lintel reaction acting at wall edge —
-        full strain-compatibility interaction curve with φ(N) envelope; capacity curve and demand envelope
-        plotted in Section 4.7 (SVG chart).
-        UR = Demand / Capacity; all checks require UR ≤ 1.00.
-        （计算过程按分段分块 KaTeX 方式显示。v0.6：平面外地震作用改按 AS/NZS 1170.5 第 8 章 parts 计算：
-        Fp = Cp × H × Wp（取代原 CdT1/CdTE 系数输入）。v0.6.2：新增 Lintel 反力作用于墙边时边缘构件的
-        局部压弯 N-M 验算——完整平截面 N-M 承载力曲线与 ϕ(N) 设计包络，4.7 节以 SVG 图表显示承载力曲线
-        与需求包络。UR = 需求 / 承载力，所有验算要求 UR ≤ 1.00。）
+        Calculation steps displayed in sectional KaTeX blocks.
       </Alert>
       <Alert severity={ResultSummary.overallPass ? 'success' : 'warning'} sx={{ mb: 2, fontWeight: 700 }}>
         {ResultSummary.overallPass
