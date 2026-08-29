@@ -396,7 +396,7 @@ export function calculateInPlaneDesign(input = {}) {
   const seismicGravity = Gi + psiE * QlineTotal;
   const Vseismic = Cd * seismicGravity;
   const Mseismic = Vseismic * hwall;
-  const NseismicCompression = seismicGravity + lintelReaction;
+  const NseismicCompression = Ngravity + lintelReaction;
   const NseismicTension = seismicGravity - lintelReaction;
 
   /* Lintel eccentricity */

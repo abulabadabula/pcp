@@ -137,7 +137,7 @@ export const INPUT_SECTIONS = [
       { key: 'hazardFactor', label: 'Hazard Factor Z', unit: '', step: '0.01', min: '0' },
       { key: 'returnPeriodFactor', label: 'Return Period Factor Ru', unit: '', step: '0.01', min: '0' },
       { key: 'ductility', label: 'Ductility Factor μ', unit: '', step: '0.05', min: '1' },
-      { key: 'spectralShapeFactor', label: 'Site Coefficient Ch(T)', unit: '', step: '0.01', min: '0' },
+      { key: 'spectralShapeFactor', label: 'Spectral Shape Factor Ch(T)', unit: '', step: '0.01', min: '0' },
       { key: 'nearFaultFactor', label: 'Near-Fault Factor N(T,D)', unit: '', step: '0.01', min: '0' },
       { key: 'period', label: 'Fundamental Period T', unit: 's', step: '0.01', min: '0.01' },
       // { key: 'seismicWeight', label: 'Tributary Seismic Weight', unit: 'kN', step: '1', min: '0' },

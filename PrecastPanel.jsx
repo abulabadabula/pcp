@@ -772,7 +772,7 @@ function InPlaneSeismicBlock({ inputs, inPlane, ResoutOfPlane }) {
         formula={`C_d(T_1) = \\frac{C(T_1)S_p}{k_\\mu} = ${tx(inplaneseismic.C, 4)}\\times\\frac{${tx(inplaneseismic.Sp)}}{${tx(inplaneseismic.mu)}} = ${tx(inplaneseismic.Cd, 4)}`} />
       <CalculationFormula caption="Seismic Weight / 地震重力荷载"
         formula={`W_i = G_i + \\sum_{i=1}^{n} \\psi_E Q = ${tx(gravity.Gwall, 2)}+${tx(gravity.GlineTotal, 2)}+${tx(inplaneseismic.psiE)}\\times${tx(gravity.QlineTotal)} = ${tx(inplaneseismic.seismicGravity)}\\mathrm{kN}`} />
-      <CalculationFormula caption="In-plane base shear / 平面内基底剪力" highlight
+      <CalculationFormula caption="Seismic In-plane base shear / 地震平面内基底剪力" highlight
         formula={`V^*_{seismic} = C_d\\,W_i = ${tx(inplaneseismic.Cd, 4)}\\times${tx(inplaneseismic.seismicGravity)} = ${tx(inplaneseismic.Vseismic)}\\,\\mathrm{kN}`} />
       <CalculationFormula caption="Seismic overturning moment / 抗震倾覆弯矩" highlight
         formula={`M^*_{seismic} = V^*_{seismic}\\,h = ${tx(inplaneseismic.Vseismic)}\\times${tx(inputs.wallHeight)} = ${tx(inplaneseismic.Mseismic)}\\,\\mathrm{kN\\cdot m}`} />
@@ -784,6 +784,7 @@ function InPlaneSeismicBlock({ inputs, inPlane, ResoutOfPlane }) {
    3. Combined In-Plane Actions（平面内组合内力）
 --------------------------------------------------------------------------- */
 function InPlaneActionsBlock({ inputs, inPlane }) {
+  const gravity = inplane.Ngravity || {}
   const seismic = inPlane.seismic || {};
   const diaphragm = inPlane.diaphragm || {};
   const sectionactions = inPlane.sectionActions || {};
@@ -801,9 +802,9 @@ function InPlaneActionsBlock({ inputs, inPlane }) {
         <CalculationFormula caption="Lintel eccentric moment / 过梁偏心弯矩"
           formula={`M_{lintel} = R_{lintel}\\,e = ${tx(inputs.lintelReaction)}\\times${tx(inputs.lintelEccentricity)} = ${tx(sectionactions.Mlintel)}\\,\\mathrm{kN\\cdot m}`} />
       </CalculationSubsection>
-      <CalculationSubsection title="3.3 Gravity forces & total actions · 轴力与总内力">
-        <CalculationFormula caption="Seismic gravity axial force / 抗震重力组合轴力"
-          formula={`N_{EQ,g} = G_{wall}+G_{line,total}+\\psi_E Q_{line,total} = ${tx(sectionactions.seismicGravity)}\\,\\mathrm{kN}`} />
+      <CalculationSubsection title="3.3 In Plane total actions · 总内力">
+        <CalculationFormula caption="Gravity Axial Force / 重力组合轴力"
+          formula={`N^*_{gravity} = ${tx(inplanegravity.Ngravity)}\\,\\mathrm{kN}`} />
         <CalculationFormula caption="Compression end axial force / 受压端的轴力" highlight
           formula={`N^*_{comp} = N_{EQ,g}+R_{lintel} = ${tx(sectionactions.seismicGravity)}+${tx(inputs.lintelReaction)} = ${tx(sectionactions.NseismicCompression)}\\,\\mathrm{kN}`} />
         <CalculationFormula caption="Tension end axial force / 受拉端的轴力"
