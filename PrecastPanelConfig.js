@@ -302,10 +302,10 @@ export const DEFAULT_INPUTS = {
   diaphragmSeismicForce – concentrated horizontal seismic force from roof
                           diaphragm acting at wall top (kN)
   ------------------------------------------------------------------------ */
-  diaphragmWindForce: 0,
-  diaphragmSeismicForce: 0,
+  diaphragmWindForce: 10,
+  diaphragmSeismicForce: 15,
   lintelReaction: 60,
-  lintelEccentricity: 0.30,
+  lintelEccentricity: 0.20,
 
   /* --------------------------------------------------------------------------
   6. OOP Specific Loads

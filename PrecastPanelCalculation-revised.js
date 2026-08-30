@@ -364,7 +364,7 @@ export function calculateInPlaneDesign(input = {}) {
   const QlineTotal = qLineLoad * bwall;
 
   /* Gravity-only ULS */
-  const Ngravity = 1.2 * (Gwall + GlineTotal) + 1.5 * QlineTotal;
+  const Ngravity = 1.2 * (Gwall + GlineTotal + lintelReaction) + 1.5 * QlineTotal;
 
   /* ------------------------------------------------------------------------
    * In-plane seismic action.
@@ -396,11 +396,11 @@ export function calculateInPlaneDesign(input = {}) {
   const seismicGravity = Gi + psiE * QlineTotal;
   const Vseismic = Cd * seismicGravity;
   const Mseismic = Vseismic * hwall;
-  const NseismicCompression = Ngravity + lintelReaction;
+  const NseismicCompression = seismicGravity + lintelReaction;
   const NseismicTension = seismicGravity - lintelReaction;
 
   /* Lintel eccentricity */
-  const Mlintel = lintelReaction * lintelEcc;
+  const Mlintel = lintelReaction * ( lintelEcc + bwall / 2 );
 
   /* Total actions: seismic + diaphragm + lintel */
   const Mtotal = Mseismic + Math.max( MdiaphragmWind, MdiaphragmSeismic) + Mlintel;
@@ -411,16 +411,19 @@ export function calculateInPlaneDesign(input = {}) {
    * Elastic section stresses.
    * ---------------------------------------------------------------------- */
 
-  const sigmaN = Ag > 0 ? kNToN(NseismicCompression) / Ag : 0;
+  const sigmaN = Ag > 0 ? kNToN(Ngravity) / Ag : 0;
 
   const sigmaM = Zg > 0 ? kNmToNmm(Mtotal) / Zg : 0;
 
   const sigmaMax = sigmaN + sigmaM;
   const sigmaMin = sigmaN - sigmaM;
 
-  const eccentricity = NseismicCompression > 0 ? Mtotal / NseismicCompression : 0;
-
-  const kern = bwall / 6;
+  const eccentricity = Ngravity > 0 ? Mtotal / Ngravity : 0;
+  const kern = bwall / 2;
+  const compareEcc = Math.abs(eccentricity) <= kern ? 'within kern' : 'outside kern';
+  const leverArm = bwall / 3 * 2;
+  const Ncompression = Ngravity/2 + Mtotal / leverArm;
+  const Ntension = Ngravity/2 - Mtotal / leverArm;
 
   /* ------------------------------------------------------------------------
    * Geometry classification. Slenderness
@@ -570,11 +573,12 @@ export function calculateInPlaneDesign(input = {}) {
       qPressure,
       Sr,
       gLineLoad,
-      qLineLoad
+      qLineLoad,
+      lintelReaction,
     },
 
     seismic: {
-      C: CT1,
+      CT1,
       Cd,
       seismicGravity,
       Vseismic,
@@ -611,7 +615,11 @@ export function calculateInPlaneDesign(input = {}) {
       sigmaMax,
       sigmaMin,
       eccentricity,
-      kern
+      kern,
+      compareEcc,
+      leverArm,
+      Ncompression,
+      Ntension
     },
 
     slenderness: {

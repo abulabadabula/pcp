@@ -418,12 +418,12 @@ function InputTab({ inputs, setInputs, previewResults }) {
   }), [inputs.wallHeight, inputs.tf, inputs.ds, inputs.ts, inputs.hroof]);
   return (
     <Box>
-      <Alert severity="info" sx={{ mb: 2 }}>
+      {/* <Alert severity="info" sx={{ mb: 2 }}>
         Wall Geometry, Reinforcement and Gravity Loads are shared between In-Plane and OOP.
         Section 12 provides two separate support conditions: one for Wind & Seismic checks,
         one for the Fire check. Section 14 / 15 feed the v0.5 connection and in-plane
         foundation calculation modules.
-      </Alert>
+      </Alert> */}
       <Paper variant="outlined" sx={{ p: 2, mt: 1.5 }}>
         <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1.5 }}>
           Model Preview — In-Plane + Out-of-Plane
@@ -734,7 +734,7 @@ function LoadDerivationBlock({ inputs, ResinPlane, ResoutOfPlane }) {
         <CalculationFormula caption="Total imposed line load / 顶部活线荷载合计"
           formula={`Q_{line,total} = q_{line}\\times b = ${tx(inplanegravity.qLineLoad)}\\times${tx(geo.bwall)} = ${tx(inplanegravity.QlineTotal)}\\,\\mathrm{kN}`} />
         <CalculationFormula caption="Gravity ULS axial force / 重力 ULS 轴力" highlight
-          formula={`N^*_{gravity} = 1.2(G_{wall}+G_{line,total}) + 1.5\\,Q_{line,total} = 1.2\\times(${tx(inplanegravity.Gwall)}+${tx(inplanegravity.GlineTotal)}) + 1.5\\times(${tx(inplanegravity.QlineTotal)}) = ${tx(inplanegravity.Ngravity)}\\,\\mathrm{kN}`} />
+          formula={`N^*_{gravity} = 1.2(G_{wall}+G_{line,total}+N_{lintel}) + 1.5\\,Q_{line,total} = 1.2\\times(${tx(inplanegravity.Gwall)}+${tx(inplanegravity.GlineTotal)}+${tx(inplanegravity.lintelReaction)}) + 1.5\\times(${tx(inplanegravity.QlineTotal)}) = ${tx(inplanegravity.Ngravity)}\\,\\mathrm{kN}`} />
       </CalculationSubsection>
       <CalculationSubsection title="1.4 OOP gravity axial force · 平面外重力轴力">
         <CalculationFormula caption="Roof dead line load / 屋面恒载"
@@ -765,16 +765,16 @@ function InPlaneSeismicBlock({ inputs, inPlane, ResoutOfPlane }) {
   return (
     <CalculationSection number="2" title="In-Plane Seismic Action · 平面内抗震作用" chip={<Chip size="small" label="AS/NZS 1170.5 §3.2.2" />}>
       <CalculationFormula caption="Elastic site hazard coefficient / 弹性场地危险系数"
-        formula={`C(T_1) = C_h(T_1)\\,Z\\,R_u\\,N(T,D) = ${tx(inplaneseismic.Ch)}\\times${tx(inplaneseismic.Z)}\\times${tx(inplaneseismic.Ru)}\\times${tx(inplaneseismic.Nt)} = ${tx(inplaneseismic.C, 5)}`} />
+        formula={`C(T_1) = C_h(T_1)\\,Z\\,R_u\\,N(T,D) = ${tx(inplaneseismic.Ch)}\\times${tx(inplaneseismic.Z)}\\times${tx(inplaneseismic.Ru)}\\times${tx(inplaneseismic.Nt)} = ${tx(inplaneseismic.CT1, 4)}`} />
       <CalculationFormula caption="Structural performance factor ULS / 结构性能系数"
         formula={`S_p = 1.3 - 0.3\\mu = 1.3 - 0.3\\times${tx(inplaneseismic.mu)} = ${tx(inplaneseismic.Sp)}`} />
       <CalculationFormula caption="Design action coefficient ULS / 设计作用系数"
-        formula={`C_d(T_1) = \\frac{C(T_1)S_p}{k_\\mu} = ${tx(inplaneseismic.C, 4)}\\times\\frac{${tx(inplaneseismic.Sp)}}{${tx(inplaneseismic.mu)}} = ${tx(inplaneseismic.Cd, 4)}`} />
-      <CalculationFormula caption="Seismic Weight / 地震重力荷载"
+        formula={`C_d(T_1) = \\frac{C(T_1)S_p}{k_\\mu} = ${tx(inplaneseismic.CT1, 4)}\\times\\frac{${tx(inplaneseismic.Sp)}}{${tx(inplaneseismic.mu)}} = ${tx(inplaneseismic.Cd, 4)}`} />
+      <CalculationFormula caption="Seismic SelfWeight / 地震重力荷载"
         formula={`W_i = G_i + \\sum_{i=1}^{n} \\psi_E Q = ${tx(gravity.Gwall, 2)}+${tx(gravity.GlineTotal, 2)}+${tx(inplaneseismic.psiE)}\\times${tx(gravity.QlineTotal)} = ${tx(inplaneseismic.seismicGravity)}\\mathrm{kN}`} />
-      <CalculationFormula caption="Seismic In-plane base shear / 地震平面内基底剪力" highlight
+      <CalculationFormula caption="Seismic Wall In-plane base shear / 地震平面内基底剪力" highlight
         formula={`V^*_{seismic} = C_d\\,W_i = ${tx(inplaneseismic.Cd, 4)}\\times${tx(inplaneseismic.seismicGravity)} = ${tx(inplaneseismic.Vseismic)}\\,\\mathrm{kN}`} />
-      <CalculationFormula caption="Seismic overturning moment / 抗震倾覆弯矩" highlight
+      <CalculationFormula caption="Seismic Wall overturning moment / 抗震倾覆弯矩" highlight
         formula={`M^*_{seismic} = V^*_{seismic}\\,h = ${tx(inplaneseismic.Vseismic)}\\times${tx(inputs.wallHeight)} = ${tx(inplaneseismic.Mseismic)}\\,\\mathrm{kN\\cdot m}`} />
     </CalculationSection>
   );
@@ -784,7 +784,7 @@ function InPlaneSeismicBlock({ inputs, inPlane, ResoutOfPlane }) {
    3. Combined In-Plane Actions（平面内组合内力）
 --------------------------------------------------------------------------- */
 function InPlaneActionsBlock({ inputs, inPlane }) {
-  const gravity = inplane.Ngravity || {}
+  const gravity = inPlane.gravity || {}
   const seismic = inPlane.seismic || {};
   const diaphragm = inPlane.diaphragm || {};
   const sectionactions = inPlane.sectionActions || {};
@@ -793,9 +793,9 @@ function InPlaneActionsBlock({ inputs, inPlane }) {
   return (
     <CalculationSection number="3" title="Combined In-Plane Actions · 平面内组合内力" chip={<Chip size="small" label="Seismic + Diaphragm + Lintel" />}>
       <CalculationSubsection title="3.1 Roof diaphragm horizontal forces · 屋盖隔膜水平传力 (at wall top)">
-        <CalculationFormula caption="Envelope diaphragm force / 隔膜水平力包络"
+        <CalculationFormula caption="Diaphragm introduced force / 隔膜水平力包络"
           formula={`V_{dia} = \\max(V_{wd},\\,V_{es}) = \\max(${tx(diaphragm.VdiaphragmWind)},\\,${tx(diaphragm.VdiaphragmSeismic)}) = ${tx(diaV)}\\,\\mathrm{kN}`} />
-        <CalculationFormula caption="Diaphragm moment at base / 隔膜底部弯矩"
+        <CalculationFormula caption="Diaphragm introduced moment at base / 隔膜底部弯矩"
           formula={`M_{dia} = V_{dia}\\times h = ${tx(diaV)}\\times${tx(inputs.wallHeight)} = ${tx(diaM)}\\,\\mathrm{kN\\cdot m}`} />
       </CalculationSubsection>
       <CalculationSubsection title="3.2 Lintel reaction & eccentricity · 过梁反力与偏心">
@@ -804,16 +804,16 @@ function InPlaneActionsBlock({ inputs, inPlane }) {
       </CalculationSubsection>
       <CalculationSubsection title="3.3 In Plane total actions · 总内力">
         <CalculationFormula caption="Gravity Axial Force / 重力组合轴力"
-          formula={`N^*_{gravity} = ${tx(inplanegravity.Ngravity)}\\,\\mathrm{kN}`} />
-        <CalculationFormula caption="Compression end axial force / 受压端的轴力" highlight
-          formula={`N^*_{comp} = N_{EQ,g}+R_{lintel} = ${tx(sectionactions.seismicGravity)}+${tx(inputs.lintelReaction)} = ${tx(sectionactions.NseismicCompression)}\\,\\mathrm{kN}`} />
-        <CalculationFormula caption="Tension end axial force / 受拉端的轴力"
-          formula={`N^*_{tension} = N_{EQ,g}-R_{lintel} = ${tx(sectionactions.seismicGravity)}-${tx(inputs.lintelReaction)} = ${tx(sectionactions.NseismicTension)}\\,\\mathrm{kN}`}
-          status={mkStatus(safe(sectionactions.NseismicTension) >= 0, 'COMPRESSION', 'TENSION / UPLIFT')} />
+          formula={`N^*_{gravity} = ${tx(gravity.Ngravity)}\\,\\mathrm{kN}`} />
         <CalculationFormula caption="Total in-plane moment / 总弯矩" highlight
           formula={`M^* = M^*_{seismic}+M_{dia}+M_{lintel} = ${tx(seismic.Mseismic)}+${tx(diaM)}+${tx(sectionactions.Mlintel)} = ${tx(sectionactions.Mtotal)}\\,\\mathrm{kN\\cdot m}`} />
         <CalculationFormula caption="Total in-plane shear / 总剪力" highlight
           formula={`V^* = V^*_{seismic}+V_{dia} = ${tx(seismic.Vseismic)}+${tx(diaV)} = ${tx(sectionactions.Vtotal)}\\,\\mathrm{kN}`} />
+        {/* <CalculationFormula caption="Compression end axial force / 受压端的轴力" highlight
+          formula={`N^*_{comp} = N_{EQ,g}+R_{lintel} = ${tx(sectionactions.seismicGravity)}+${tx(inputs.lintelReaction)} = ${tx(sectionactions.NseismicCompression)}\\,\\mathrm{kN}`} />
+        <CalculationFormula caption="Tension end axial force / 受拉端的轴力"
+          formula={`N^*_{tension} = N_{EQ,g}-R_{lintel} = ${tx(sectionactions.seismicGravity)}-${tx(inputs.lintelReaction)} = ${tx(sectionactions.NseismicTension)}\\,\\mathrm{kN}`}
+          status={mkStatus(safe(sectionactions.NseismicTension) >= 0, 'COMPRESSION', 'TENSION / UPLIFT')} /> */}
       </CalculationSubsection>
     </CalculationSection>
   );
@@ -825,6 +825,7 @@ function InPlaneActionsBlock({ inputs, inPlane }) {
 --------------------------------------------------------------------------- */
 function InPlaneChecksBlock({ inputs, inPlane }) {
   const geo = inPlane.geometry || {};
+  const gravity = inPlane.gravity || {};
   const sectionactions = inPlane.sectionActions || {};
   const es = inPlane.elasticStress || {};
   const sl = inPlane.slenderness || {};
@@ -847,7 +848,7 @@ function InPlaneChecksBlock({ inputs, inPlane }) {
     <CalculationSection number="4" title="In-Plane Section Checks · 平面内截面验算" chip={<Chip size="small" label="NZS 3101 (simplified)" />}>
       <CalculationSubsection title="4.1 Elastic stress distribution · 弹性应力分布">
         <CalculationFormula caption="Uniform axial stress / 均匀轴压应力"
-          formula={`\\sigma_N = \\frac{N^*}{A_g} = \\frac{${tx(sectionactions.NseismicCompression)}\\times1000}{${tx(geo.Ag, 0)}} = ${tx(es.sigmaN, 4)}\\,\\mathrm{MPa}`} />
+          formula={`\\sigma_N = \\frac{N^*}{A_g} = \\frac{${tx(gravity.Ngravity)}\\times1000}{${tx(geo.Ag, 0)}} = ${tx(es.sigmaN, 4)}\\,\\mathrm{MPa}`} />
         <CalculationFormula caption="Bending stress / 弯曲应力"
           formula={`\\sigma_M = \\frac{M^*}{Z_g} = \\frac{${tx(sectionactions.Mtotal)}\\times10^6}{${tx(geo.Zg, 0)}} = ${tx(es.sigmaM, 4)}\\,\\mathrm{MPa}`} />
         <CalculationFormula caption="Maximum edge compression / 最大边缘压应力" highlight
@@ -857,7 +858,12 @@ function InPlaneChecksBlock({ inputs, inPlane }) {
           formula={`\\sigma_{min} = \\sigma_N-\\sigma_M = ${tx(es.sigmaMin, 4)}\\,\\mathrm{MPa}`}
           status={mkStatus(safe(es.sigmaMin) >= 0, 'NO TENSION', 'TENSION PREDICTED')} />
         <CalculationFormula caption="Resultant eccentricity / 合力偏心距"
-          formula={`e = \\frac{M^*}{N^*} = \\frac{${tx(sectionactions.Mtotal)}}{${tx(sectionactions.NseismicCompression)}} = ${tx(es.eccentricity, 4)}\\,\\mathrm{m} = ${tx(safe(es.eccentricity) * 1000, 1)}\\,\\mathrm{mm},\\qquad e_{kern} = \\frac{b}{6} = \\frac{${tx(geo.b)}}{6} = ${tx(es.kern, 4)}\\,\\mathrm{m}`} />
+          formula={`e = \\frac{M^*}{N^*} = \\frac{${tx(sectionactions.Mtotal)}}{${tx(gravity.Ngravity)}} = ${tx(es.eccentricity, 4)}\\,\\mathrm{m} = ${tx(safe(es.eccentricity) * 1000, 1)}\\,\\mathrm{mm},\\qquad   \\frac{l_w}{2} = \\frac{${tx(geo.bwall)}}{2} = ${tx(es.kern, 1)}\\,\\mathrm{m}\\qquad ${es.compareEcc}`} />
+        <CalculationFormula caption="Lever arm / 力臂Z"
+          formula={`Z = \\frac{2}{3} l_w = \\frac{2}{3}\\times ${tx(geo.bwall)} = ${tx(es.leverArm, 1)}\\,\\mathrm{m}`} />
+        <CalculationFormula caption="Resultant force at ends / 端部受力"
+          formula={`N_{comp} = N^* / 2 + M^* / Z = ${tx(gravity.Ngravity)} / 2 + ${tx(sectionactions.Mtotal)} / ${tx(es.leverArm, 1)} = ${tx(es.Ncompression, 2)}\\,\\mathrm{kN},\\qquad N_{tension} = N^* / 2 - M^* / Z = ${tx(gravity.Ngravity)} / 2 - ${tx(sectionactions.Mtotal)} / ${tx(es.leverArm, 1)} = ${tx(es.Ntension, 2)}\\,\\mathrm{kN}`}
+          status={mkStatus(safe(es.Ntension) > 0, 'COMPRESSION', 'TENSION / UPLIFT')} />
       </CalculationSubsection>
       <CalculationSubsection title="4.2 Slenderness classification · 长细比与分类">
         <CalculationFormula caption="In-plane aspect ratio / 平面内高宽比"
@@ -868,7 +874,7 @@ function InPlaneChecksBlock({ inputs, inPlane }) {
       </CalculationSubsection>
       <CalculationSubsection title="4.3 Lintel bearing (D-region) · 过梁局部承压">
         <CalculationFormula caption="Bearing area / 承压面积"
-          formula={`A_b = \\frac{b_b}{1000}\\times\\frac{l_b}{1000} = \\frac{${tx(inputs.bearingWidth,0)}}{1000}\\times\\frac{${tx(inputs.bearingLength,0)}}{1000} = ${tx(safe(inputs.bearingWidth) * safe(inputs.bearingLength) / 1e6, 6)}\\,\\mathrm{m^2} = ${tx(safe(inputs.bearingWidth) * safe(inputs.bearingLength), 0)}\\,\\mathrm{mm^2}`} />
+          formula={`A_b = b_b\\times l_b = \\frac{${tx(inputs.bearingWidth,0)}}{1000}\\times\\frac{${tx(inputs.bearingLength,0)}}{1000} = ${tx(safe(inputs.bearingWidth) * safe(inputs.bearingLength) / 1e6, 4)}\\,\\mathrm{m^2} = ${tx(safe(inputs.bearingWidth) * safe(inputs.bearingLength), 0)}\\,\\mathrm{mm^2}`} />
         <CalculationFormula caption="Bearing stress / 承压应力"
           formula={`\\sigma_b = \\frac{R_{lintel}}{A_b} = \\frac{${tx(inputs.lintelReaction)}\\times1000}{${tx(safe(inputs.bearingWidth) * safe(inputs.bearingLength), 0)}} = ${tx(be.bearingStress, 4)}\\,\\mathrm{MPa}`} />
         <CalculationFormula caption="Bearing capacity / 承压承载力限值"
@@ -992,165 +998,288 @@ function InPlaneChecksBlock({ inputs, inPlane }) {
 /* ---------------------------------------------------------------------------
    5. Out-of-Plane Design（平面外设计）Calculation Tab调用
 --------------------------------------------------------------------------- */
-function OutOfPlaneBlock({ inputs, outOfPlane }) {
-  const oopResult = outOfPlane || {};
-  const hv = oopResult.hroofValidation || {};
-  const sc = oopResult.supportConditions || {};
-  const add = oopResult.additionalLoads || {};
-  const ps = oopResult.partSeismic || {};
-  const wsF = sc.windSeismicFactors || { mid: 1 / 8, base: 1 / 8 };
-  const fF = sc.fireFactors || { base: 1 / 2 };
-  /* ★ 为公式展示推算辅助变量 */
-  const hroofEff = safe(hv.hroofEffective);
-  const baseLeverArm = Math.max(safe(inputs.wallHeight) - hroofEff - safe(inputs.tf) / 1000, 0);
-  const HwMinusTf = safe(inputs.wallHeight) - safe(inputs.tf) / 1000;
-  return (
-    <CalculationSection number="5" title="Out-of-Plane Design · 平面外设计" chip={<Chip size="small" label="AS/NZS 1170.5 Ch.8 Parts / §8.5.1" />}>
-      <CalculationSubsection title="5.1 hroof validation · hroof 校验">
-        <CalculationFormula caption="Maximum allowed / 允许最大值"
-          formula={`h_{roof,max} = H_w - t_f - d_s - t_s = ${tx(inputs.wallHeight)} - ${tx(safe(inputs.tf) / 1000)} - ${tx(safe(inputs.ds) / 1000)} - ${tx(safe(inputs.ts) / 1000)} = ${tx(hv.hroofMax)}\\,\\mathrm{m}`} />
-        <CalculationFormula caption="Effective value used / 实际采用值" highlight
-          formula={`h_{roof,eff} = \\min(h_{roof},\\,h_{roof,max}) = \\min(${tx(inputs.hroof)},\\,${tx(hv.hroofMax)}) = ${tx(hv.hroofEffective)}\\,\\mathrm{m}`}
-          status={mkStatus(hv.hroofValid, 'VALID', 'CLAMPED')} />
-      </CalculationSubsection>
-      <CalculationSubsection title="5.2 OOP lateral actions (AS/NZS 1170.5 Ch.8 parts) · 平面外水平作用（第 8 章 parts）">
-        <CalculationFormula caption="Part height amplification factor / part 高度放大系数 (§8.4.2.3)"
-          formula={`H = 1 + 2\\frac{h_x}{h_n} = 1 + 2\\times\\frac{${tx(ps.hx)}}{${tx(ps.hn)}} = ${tx(ps.H, 3)}`} />
-        <CalculationFormula caption="Wall panel tributary weight / 墙板重量（每延米，沿 OOP 计算高度 hroof）"
-          formula={`W_p = \\gamma_c\\,t_w\\,h_{roof} = (${tx(inputs.concreteDensity)})(${tx(safe(inputs.wallThickness))})(${tx(hv.hroofEffective)}) = ${tx(ps.Wp)}\\,\\mathrm{kN/m}`} />
+// function OutOfPlaneBlock({ inputs, outOfPlane }) {
+//   const oopResult = outOfPlane || {};
+//   const hv = oopResult.hroofValidation || {};
+//   const sc = oopResult.supportConditions || {};
+//   const add = oopResult.additionalLoads || {};
+//   const ps = oopResult.partSeismic || {};
+//   const wsF = sc.windSeismicFactors || { mid: 1 / 8, base: 1 / 8 };
+//   const fF = sc.fireFactors || { base: 1 / 2 };
+//   /* ★ 为公式展示推算辅助变量 */
+//   const hroofEff = safe(hv.hroofEffective);
+//   const baseLeverArm = Math.max(safe(inputs.wallHeight) - hroofEff - safe(inputs.tf) / 1000, 0);
+//   const HwMinusTf = safe(inputs.wallHeight) - safe(inputs.tf) / 1000;
+//   return (
+//     <CalculationSection number="5" title="Out-of-Plane Design · 平面外设计" chip={<Chip size="small" label="AS/NZS 1170.5 Ch.8 Parts / §8.5.1" />}>
+//       <CalculationSubsection title="5.1 hroof validation · hroof 校验">
+//         <CalculationFormula caption="Maximum allowed / 允许最大值"
+//           formula={`h_{roof,max} = H_w - t_f - d_s - t_s = ${tx(inputs.wallHeight)} - ${tx(safe(inputs.tf) / 1000)} - ${tx(safe(inputs.ds) / 1000)} - ${tx(safe(inputs.ts) / 1000)} = ${tx(hv.hroofMax)}\\,\\mathrm{m}`} />
+//         <CalculationFormula caption="Effective value used / 实际采用值" highlight
+//           formula={`h_{roof,eff} = \\min(h_{roof},\\,h_{roof,max}) = \\min(${tx(inputs.hroof)},\\,${tx(hv.hroofMax)}) = ${tx(hv.hroofEffective)}\\,\\mathrm{m}`}
+//           status={mkStatus(hv.hroofValid, 'VALID', 'CLAMPED')} />
+//       </CalculationSubsection>
+//       <CalculationSubsection title="5.2 OOP lateral actions (AS/NZS 1170.5 Ch.8 parts) · 平面外水平作用（第 8 章 parts）">
+//         <CalculationFormula caption="Part height amplification factor / part 高度放大系数 (§8.4.2.3)"
+//           formula={`H = 1 + 2\\frac{h_x}{h_n} = 1 + 2\\times\\frac{${tx(ps.hx)}}{${tx(ps.hn)}} = ${tx(ps.H, 3)}`} />
+//         <CalculationFormula caption="Wall panel tributary weight / 墙板重量（每延米，沿 OOP 计算高度 hroof）"
+//           formula={`W_p = \\gamma_c\\,t_w\\,h_{roof} = (${tx(inputs.concreteDensity)})(${tx(safe(inputs.wallThickness))})(${tx(hv.hroofEffective)}) = ${tx(ps.Wp)}\\,\\mathrm{kN/m}`} />
 
-        {/* 👇 新增：展示 Sp 和 Cp 的计算 👇 */}
-        <CalculationFormula caption="Part response coefficient Sp / Part 响应系数 (§8.4.2.1) "
-          formula={`S_p = ${tx(ps.Sp, 3)}`} />
+//         {/* 👇 新增：展示 Sp 和 Cp 的计算 👇 */}
+//         <CalculationFormula caption="Part response coefficient Sp / Part 响应系数 (§8.4.2.1) "
+//           formula={`S_p = ${tx(ps.Sp, 3)}`} />
           
-        <CalculationFormula caption="Part component factor Cp / Part 构件系数 (§8.4.2.1) "
-          formula={`C_p = \\frac{a_p\\,S_p}{R_p\\,\\mu_p} = \\frac{${tx(ps.ap)}\\times${tx(ps.Sp, 3)}}{${tx(ps.Rp)}\\times${tx(ps.mu_p)}} = ${tx(ps.Cp, 3)}`} />
+//         <CalculationFormula caption="Part component factor Cp / Part 构件系数 (§8.4.2.1) "
+//           formula={`C_p = \\frac{a_p\\,S_p}{R_p\\,\\mu_p} = \\frac{${tx(ps.ap)}\\times${tx(ps.Sp, 3)}}{${tx(ps.Rp)}\\times${tx(ps.mu_p)}} = ${tx(ps.Cp, 3)}`} />
 
-        <CalculationFormula caption="Calculated part seismic force / 计算 Part 地震力 "
-          formula={`F_p = C_p\\,H\\,W_p = (${tx(ps.Cp, 3)})(${tx(ps.H, 3)})(${tx(ps.Wp)}) = ${tx(ps.Fp)}\\,\\mathrm{kN/m}`} />
+//         <CalculationFormula caption="Calculated part seismic force / 计算 Part 地震力 "
+//           formula={`F_p = C_p\\,H\\,W_p = (${tx(ps.Cp, 3)})(${tx(ps.H, 3)})(${tx(ps.Wp)}) = ${tx(ps.Fp)}\\,\\mathrm{kN/m}`} />
 
-        {/* 👇 新增：展示 Fp_min 安全底线 👇 */}
-        <CalculationFormula caption="Minimum seismic force limit / 最小地震力底线 (§8.4.2.2) " highlight
-          formula={`F_{p,min} = 0.3\\,S_p\\,I\\,W_p = 0.3\\times${tx(ps.Sp, 3)}\\times${tx(ps.I)}\\times${tx(ps.Wp)} = ${tx(ps.Fp_min)}\\,\\mathrm{kN/m}`} />
+//         {/* 👇 新增：展示 Fp_min 安全底线 👇 */}
+//         <CalculationFormula caption="Minimum seismic force limit / 最小地震力底线 (§8.4.2.2) " highlight
+//           formula={`F_{p,min} = 0.3\\,S_p\\,I\\,W_p = 0.3\\times${tx(ps.Sp, 3)}\\times${tx(ps.I)}\\times${tx(ps.Wp)} = ${tx(ps.Fp_min)}\\,\\mathrm{kN/m}`} />
 
-        <CalculationFormula caption="Governing design seismic force / 控制设计地震力 " highlight
-          formula={`F_{p,design} = \\max(F_p,\\,F_{p,min}) = ${tx(ps.Fp_design)}\\,\\mathrm{kN/m}`} />
+//         <CalculationFormula caption="Governing design seismic force / 控制设计地震力 " highlight
+//           formula={`F_{p,design} = \\max(F_p,\\,F_{p,min}) = ${tx(ps.Fp_design)}\\,\\mathrm{kN/m}`} />
 
-        <CalculationFormula caption="OOP seismic pressure (uniform over hroof) / 平面外地震压力 "
-          formula={`W_E = \\frac{F_{p,design}}{h_{roof}} = ${tx(oopResult.WE)}\\,\\mathrm{kPa}`} />
+//         <CalculationFormula caption="OOP seismic pressure (uniform over hroof) / 平面外地震压力 "
+//           formula={`W_E = \\frac{F_{p,design}}{h_{roof}} = ${tx(oopResult.WE)}\\,\\mathrm{kPa}`} />
 
 
 
-        <CalculationFormula caption="Part seismic force (§8.4.2.2) / part 地震作用" highlight
-          formula={`F_p = C_p\\,H\\,W_p = (${tx(ps.Cp)})(${tx(ps.H, 3)})(${tx(ps.Wp)}) = ${tx(ps.Fp)}\\,\\mathrm{kN/m}`} />
-        <CalculationFormula caption="OOP seismic pressure (uniform over hroof) / 平面外地震压力" highlight
-          formula={`W_E = \\frac{F_p}{h_{roof}} = C_p\\,H\\,\\gamma_c\\,t_w = ${tx(oopResult.WE)}\\,\\mathrm{kPa}`} />
-        <CalculationFormula caption="Governing wind pressure / 控制风压"
-          formula={`W_{pressure} = \\max(w_{wd},\\,w_{wf}) = \\max(${tx(inputs.wwd)},\\,${tx(inputs.wwf)}) = ${tx(oopResult.WindPressure)}\\,\\mathrm{kPa}`} />
-        <CalculationFormula caption="Max-moment height / 最大弯矩高度"
-          formula={`x_m = \\frac{h_{roof}}{2} = \\frac{${tx(hroofEff)}}{2} = ${tx(oopResult.x_m)}\\,\\mathrm{m}`} />
-        <CalculationFormula caption="Seismic mid-height moment / 地震中部弯矩"
-          formula={`M_E = \\frac{W_E\\,x_m(h^2-x_m h)}{2h} = \\frac{${tx(oopResult.WE)}\\times${tx(oopResult.x_m)}\\times(${tx(hroofEff)}^2-${tx(oopResult.x_m)}\\times${tx(hroofEff)})}{2\\times${tx(hroofEff)}} = ${tx(oopResult.ME)}\\,\\mathrm{kN\\cdot m/m}`} />
-        <CalculationFormula caption="Wind mid-height moment / 风中部弯矩"
-          formula={`M_W = \\frac{W_{pressure}\\,x_m(h^2-x_m h)}{2h} = \\frac{${tx(oopResult.WindPressure)}\\times${tx(oopResult.x_m)}\\times(${tx(hroofEff)}^2-${tx(oopResult.x_m)}\\times${tx(hroofEff)})}{2\\times${tx(hroofEff)}} = ${tx(oopResult.MW)}\\,\\mathrm{kN\\cdot m/m}`} />
-        <CalculationFormula caption="Additional point-load mid contribution / 附加点荷载中部贡献"
-          formula={`\\Delta M_{add,mid} = F_{add}\\max(h_F-x_m,0)+M_{add} = ${tx(add.F_add)}\\times\\max(${tx(add.h_force)}-${tx(oopResult.x_m)},0)+${tx(add.M_add)} = ${tx(add.M_add_mid_F)}+${tx(add.M_add_mid_M)}\\,\\mathrm{kN\\cdot m/m}`} />
-      </CalculationSubsection>
-      <CalculationSubsection title={`5.3 Support condition factors · 支承条件弯矩系数 (W&S: ${sc.windSeismic || 'Pinned-Pinned'}; Fire: ${sc.fire || 'Fixed-Free'})`}>
-        <Box sx={{ overflowX: 'auto', mb: 1.5 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr>
-                {['Support condition', 'Mid-height k', 'Base k', 'Assigned to'].map(hd => (
-                  <th key={hd} style={{ textAlign: 'left', padding: '6px 10px', borderBottom: '2px solid #e5e7eb', fontWeight: 800 }}>{hd}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {SUPPORT_MOMENT_TABLE.map(row => {
-                const isWS = (sc.windSeismic || 'Pinned-Pinned') === row.key;
-                const isFire = (sc.fire || 'Fixed-Free') === row.key;
-                return (
-                  <tr key={row.key} style={{ background: (isWS || isFire) ? '#f0f7ff' : 'transparent' }}>
-                    <td style={{ padding: '6px 10px', borderBottom: '1px solid #eee', fontWeight: 600 }}>{row.label}</td>
-                    <td style={{ padding: '6px 10px', borderBottom: '1px solid #eee' }}>{row.mid} = {row.midVal.toFixed(4)}</td>
-                    <td style={{ padding: '6px 10px', borderBottom: '1px solid #eee' }}>{row.base} = {row.baseVal.toFixed(4)}</td>
-                    <td style={{ padding: '6px 10px', borderBottom: '1px solid #eee' }}>
-                      {isWS && <Chip size="small" color="primary" label="Wind & Seismic" sx={{ mr: 0.5 }} />}
-                      {isFire && <Chip size="small" color="error" label="Fire" />}
-                      {!isWS && !isFire && <span style={{ color: '#9ca3af' }}>—</span>}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </Box>
-        <CalculationFormula caption="Adjustment factors (vs baseline wL²/8 & wL²/2) / 中部/底部/火灾调整系数" highlight
-          formula={`k_{mid} = \\frac{${tx(wsF.mid, 4)}}{1/8} = ${tx(sc.wsMidAdjust, 3)},\\qquad k_{base} = \\frac{${tx(wsF.base, 4)}}{1/8} = ${tx(sc.wsBaseAdjust, 3)},\\qquad k_{fire} = \\frac{${tx(fF.base, 4)}}{1/2} = ${tx(sc.fireAdjust, 3)}`} />
-        <CalculationFormula caption="Mid-height design moment / 中部设计弯矩 (incl. support factor & additional loads)" highlight
-          formula={`M_a = \\max(M_E,M_W)\\,k_{mid} + \\Delta M_{add,mid} = \\max(${tx(oopResult.ME)},${tx(oopResult.MW)})\\times${tx(sc.wsMidAdjust, 3)}+${tx(safe(add.M_add_mid_F) + safe(add.M_add_mid_M))} = ${tx(oopResult.Ma)}\\,\\mathrm{kN\\cdot m/m}`} />
-      </CalculationSubsection>
-      <CalculationSubsection title="5.4 Flexural capacity · 抗弯承载力">
-        <CalculationFormula caption="Steel tension / 钢筋拉力"
-          formula={`T_s = L_w A_{WV} f_y/1000 = ${tx(oopResult.Ts)}\\,\\mathrm{kN}`} />
-        <CalculationFormula caption="Stress block depth / 应力块高度"
-          formula={`a = \\frac{T_s\\times1000}{0.85 f'_c L_w\\times1000} = ${tx(oopResult.a, 1)}\\,\\mathrm{mm},\\qquad d = 0.5t_w = ${tx(oopResult.d, 0)}\\,\\mathrm{mm}`} />
-        <CalculationFormula caption="Flexural capacity / 抗弯承载力" highlight
-          formula={`\\phi M_n = 0.85\\,A_{WV}f_y\\left(d-\\frac{a}{2}\\right)/10^6 = ${tx(oopResult.phiMn)}\\,\\mathrm{kN\\cdot m/m}`} />
-      </CalculationSubsection>
-      <CalculationSubsection title="5.5 P-Delta mid-height check (UR1) · P-Δ 中部验算">
-        <CalculationFormula caption="Concrete modulus / 混凝土弹性模量"
-          formula={`E_c = 3320\\sqrt{f'_c}+6900 = ${tx(oopResult.Ec, 0)}\\,\\mathrm{MPa}`} />
-        <CalculationFormula caption="Equivalent steel area / 换算钢筋面积"
-          formula={`A_{se} = \\frac{N_{GE}\\times1000 + A_{WV}f_y}{f_y} = ${tx(oopResult.Ase, 0)}\\,\\mathrm{mm^2/m}`} />
-        <CalculationFormula caption="Cracked second moment / 开裂截面惯性矩"
-          formula={`I_{cr} = nA_{se}(d-kd)^2 + \\frac{(kd)^3}{3} = ${tx(oopResult.Icr, 0)}\\,\\mathrm{mm^4/m}`} />
-        <CalculationFormula caption="P-Δ magnified moment / P-Δ 放大弯矩" highlight
-          formula={`M' = \\frac{M_a}{1-\\dfrac{5N_a h_{roof}^2}{0.75\\times48\\,E_c I_{cr}}} = \\frac{${tx(oopResult.Ma)}}{1-\\dfrac{5\\times${tx(oopResult.Na)}\\times${tx(hroofEff * 1000, 0)}^2}{0.75\\times48\\times${tx(oopResult.Ec, 0)}\\times${tx(oopResult.Icr, 0)}}} = ${tx(oopResult.M_prime)}\\,\\mathrm{kN\\cdot m/m}`} />
-        <CalculationFormula caption="Ultimate deflection / 极限挠度"
-          formula={`\\Delta_u = \\frac{5M' h_{roof}^2}{0.75\\times48\\,E_c I_{cr}} = \\frac{5\\times${tx(oopResult.M_prime)}\\times${tx(hroofEff * 1000, 0)}^2}{0.75\\times48\\times${tx(oopResult.Ec, 0)}\\times${tx(oopResult.Icr, 0)}} = ${tx(oopResult.delta_u, 1)}\\,\\mathrm{mm}`} />
-        <CalculationFormula caption="Mid-height utilisation / 中部利用率" highlight
-          formula={`UR_1 = \\frac{M'}{\\phi M_n} = ${txUR(oopResult.UR1)} = ${txPct(oopResult.UR1)}\\%`}
-          status={mkStatus(Number.isFinite(oopResult.UR1) && oopResult.UR1 <= 1, 'PASS', 'CHECK')} />
-      </CalculationSubsection>
-      <CalculationSubsection title="5.6 Base moment check (UR2) · 底部弯矩验算">
-        <CalculationFormula caption="Base moments (incl. support factor & additional loads) / 底部弯矩"
-          formula={`M_{bE} = \\frac{W_E(h^2-2a^2)}{8}k_{base} + \\Delta M_{add,base} = \\frac{${tx(oopResult.WE)}\\times(${tx(hroofEff)}^2-2\\times${tx(baseLeverArm)}^2)}{8}\\times${tx(sc.wsBaseAdjust, 3)}+${tx(safe(add.M_add_base_F) + safe(add.M_add_base_M))} = ${tx(oopResult.MbE)}\\,\\mathrm{kN\\cdot m/m}`} />
-        <CalculationFormula caption="Wind base moment / 风底部弯矩"
-          formula={`M_{bW} = \\frac{W_{pressure}(h^2-2a^2)}{8}k_{base} + \\Delta M_{add,base} = \\frac{${tx(oopResult.WindPressure)}\\times(${tx(hroofEff)}^2-2\\times${tx(baseLeverArm)}^2)}{8}\\times${tx(sc.wsBaseAdjust, 3)}+${tx(safe(add.M_add_base_F) + safe(add.M_add_base_M))} = ${tx(oopResult.MbW)}\\,\\mathrm{kN\\cdot m/m}`} />
-        <CalculationFormula caption="Base utilisation / 底部利用率" highlight
-          formula={`UR_2 = \\frac{\\max(M_{bE},M_{bW})}{\\phi M_n} = ${txUR(oopResult.UR2)} = ${txPct(oopResult.UR2)}\\%`}
-          status={mkStatus(Number.isFinite(oopResult.UR2) && oopResult.UR2 <= 1, 'PASS', 'CHECK')} />
-      </CalculationSubsection>
-      <CalculationSubsection title="5.7 Fire check (UR3) · 火灾验算 (support: Fire option)">
-        <CalculationFormula caption="Axis distance / 钢筋轴向距离"
-          formula={`x_t = \\frac{t_w}{2}-\\frac{\\phi_v}{2}-\\phi_h = ${tx(oopResult.xt, 1)}\\,\\mathrm{mm}`} />
-        <CalculationFormula caption="Reduction factors / 温度折减系数"
-          formula={`\\eta_x = 0.16\\ln(t_h x_t^{-2})-0.65 = ${tx(oopResult.etax, 3)},\\qquad \\eta_w = 1-0.162\\,t_h^{-0.6} = ${tx(oopResult.etaw, 3)}`} />
-        <CalculationFormula caption="Steel temperature & reduced yield / 钢筋温度与折减屈服"
-          formula={`T_{fs} = \\eta_x\\eta_w\\times660 = ${tx(oopResult.Tfs, 0)}\\,^{\\circ}\\mathrm{C},\\qquad f_{yt} = \\frac{720-T_{fs}}{470}f_y\\,(clamped) = ${tx(oopResult.fyt, 0)}\\,\\mathrm{MPa}`} />
-        <CalculationFormula caption="Fire moment (wL²/2 × k_fire) / 火灾弯矩"
-          formula={`M_{bf} = \\frac{w_f(H_w-t_f)^2}{2}\\,k_{fire} = \\frac{${tx(inputs.wf)}\\times(${tx(HwMinusTf)})^2}{2}\\times${tx(sc.fireAdjust, 3)} = ${tx(oopResult.Mbf)}\\,\\mathrm{kN\\cdot m/m}`} />
-        <CalculationFormula caption="Fire utilisation / 火灾利用率" highlight
-          formula={`UR_3 = \\frac{M_{bf}}{\\phi M_{n,fire}} = ${txUR(oopResult.UR3)} = ${txPct(oopResult.UR3)}\\%`}
-          status={mkStatus(Number.isFinite(oopResult.UR3) && oopResult.UR3 <= 1, 'PASS', 'CHECK')} />
-      </CalculationSubsection>
-      <CalculationSubsection title="5.8 OOP shear (UR4) · 平面外抗剪">
-        <CalculationFormula caption="Seismic shear / 地震剪力"
-          formula={`V_E = \\frac{5}{8}W_E(H_w-t_f)+F_{add} = \\frac{5}{8}\\times${tx(oopResult.WE)}\\times${tx(HwMinusTf)}+${tx(add.F_add)} = ${tx(oopResult.VE)}\\,\\mathrm{kN/m}`} />
-        <CalculationFormula caption="Wind shear / 风剪力"
-          formula={`V_w = \\frac{5}{8}W_{pressure}(H_w-t_f)+F_{add} = \\frac{5}{8}\\times${tx(oopResult.WindPressure)}\\times${tx(HwMinusTf)}+${tx(add.F_add)} = ${tx(oopResult.Vw)}\\,\\mathrm{kN/m}`} />
-        <CalculationFormula caption="Concrete shear contribution / 混凝土抗剪贡献"
-          formula={`V_c = \\left(0.25\\sqrt{f'_c}+\\frac{N'}{4A_g}\\right)\\frac{d}{1000} = \\left(0.25\\sqrt{${tx(inputs.fc)}}+\\frac{${tx(oopResult.Na)}}{4\\times${tx(oopResult.Ag, 0)}}\\right)\\times\\frac{${tx(oopResult.d, 0)}}{1000} = ${tx(oopResult.Vc)}\\,\\mathrm{kN/m}`} />
-        <CalculationFormula caption="Horizontal steel contribution / 水平筋抗剪贡献"
-          formula={`V_s = \\frac{A_{wh}f_y d}{s_h\\times1000} = \\frac{${tx(oopResult.AWH, 1)}\\times${tx(inputs.fy)}\\times${tx(oopResult.d, 0)}}{${tx(inputs.HbarSpace, 0)}\\times1000} = ${tx(oopResult.Vs)}\\,\\mathrm{kN/m}`} />
-        <CalculationFormula caption="Shear utilisation / 抗剪利用率" highlight
-          formula={`UR_4 = \\frac{\\max(V_E,V_w)}{0.75(V_c+V_s)} = \\frac{\\max(${tx(oopResult.VE)},${tx(oopResult.Vw)})}{0.75(${tx(oopResult.Vc)}+${tx(oopResult.Vs)})} = ${txUR(oopResult.UR4)} = ${txPct(oopResult.UR4)}\\%`}
-          status={mkStatus(Number.isFinite(oopResult.UR4) && oopResult.UR4 <= 1, 'PASS', 'CHECK')} />
-      </CalculationSubsection>
-    </CalculationSection>
-  );
+//         <CalculationFormula caption="Part seismic force (§8.4.2.2) / part 地震作用" highlight
+//           formula={`F_p = C_p\\,H\\,W_p = (${tx(ps.Cp)})(${tx(ps.H, 3)})(${tx(ps.Wp)}) = ${tx(ps.Fp)}\\,\\mathrm{kN/m}`} />
+//         <CalculationFormula caption="OOP seismic pressure (uniform over hroof) / 平面外地震压力" highlight
+//           formula={`W_E = \\frac{F_p}{h_{roof}} = C_p\\,H\\,\\gamma_c\\,t_w = ${tx(oopResult.WE)}\\,\\mathrm{kPa}`} />
+//         <CalculationFormula caption="Governing wind pressure / 控制风压"
+//           formula={`W_{pressure} = \\max(w_{wd},\\,w_{wf}) = \\max(${tx(inputs.wwd)},\\,${tx(inputs.wwf)}) = ${tx(oopResult.WindPressure)}\\,\\mathrm{kPa}`} />
+//         <CalculationFormula caption="Max-moment height / 最大弯矩高度"
+//           formula={`x_m = \\frac{h_{roof}}{2} = \\frac{${tx(hroofEff)}}{2} = ${tx(oopResult.x_m)}\\,\\mathrm{m}`} />
+//         <CalculationFormula caption="Seismic mid-height moment / 地震中部弯矩"
+//           formula={`M_E = \\frac{W_E\\,x_m(h^2-x_m h)}{2h} = \\frac{${tx(oopResult.WE)}\\times${tx(oopResult.x_m)}\\times(${tx(hroofEff)}^2-${tx(oopResult.x_m)}\\times${tx(hroofEff)})}{2\\times${tx(hroofEff)}} = ${tx(oopResult.ME)}\\,\\mathrm{kN\\cdot m/m}`} />
+//         <CalculationFormula caption="Wind mid-height moment / 风中部弯矩"
+//           formula={`M_W = \\frac{W_{pressure}\\,x_m(h^2-x_m h)}{2h} = \\frac{${tx(oopResult.WindPressure)}\\times${tx(oopResult.x_m)}\\times(${tx(hroofEff)}^2-${tx(oopResult.x_m)}\\times${tx(hroofEff)})}{2\\times${tx(hroofEff)}} = ${tx(oopResult.MW)}\\,\\mathrm{kN\\cdot m/m}`} />
+//         <CalculationFormula caption="Additional point-load mid contribution / 附加点荷载中部贡献"
+//           formula={`\\Delta M_{add,mid} = F_{add}\\max(h_F-x_m,0)+M_{add} = ${tx(add.F_add)}\\times\\max(${tx(add.h_force)}-${tx(oopResult.x_m)},0)+${tx(add.M_add)} = ${tx(add.M_add_mid_F)}+${tx(add.M_add_mid_M)}\\,\\mathrm{kN\\cdot m/m}`} />
+//       </CalculationSubsection>
+//       <CalculationSubsection title={`5.3 Support condition factors · 支承条件弯矩系数 (W&S: ${sc.windSeismic || 'Pinned-Pinned'}; Fire: ${sc.fire || 'Fixed-Free'})`}>
+//         <Box sx={{ overflowX: 'auto', mb: 1.5 }}>
+//           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+//             <thead>
+//               <tr>
+//                 {['Support condition', 'Mid-height k', 'Base k', 'Assigned to'].map(hd => (
+//                   <th key={hd} style={{ textAlign: 'left', padding: '6px 10px', borderBottom: '2px solid #e5e7eb', fontWeight: 800 }}>{hd}</th>
+//                 ))}
+//               </tr>
+//             </thead>
+//             <tbody>
+//               {SUPPORT_MOMENT_TABLE.map(row => {
+//                 const isWS = (sc.windSeismic || 'Pinned-Pinned') === row.key;
+//                 const isFire = (sc.fire || 'Fixed-Free') === row.key;
+//                 return (
+//                   <tr key={row.key} style={{ background: (isWS || isFire) ? '#f0f7ff' : 'transparent' }}>
+//                     <td style={{ padding: '6px 10px', borderBottom: '1px solid #eee', fontWeight: 600 }}>{row.label}</td>
+//                     <td style={{ padding: '6px 10px', borderBottom: '1px solid #eee' }}>{row.mid} = {row.midVal.toFixed(4)}</td>
+//                     <td style={{ padding: '6px 10px', borderBottom: '1px solid #eee' }}>{row.base} = {row.baseVal.toFixed(4)}</td>
+//                     <td style={{ padding: '6px 10px', borderBottom: '1px solid #eee' }}>
+//                       {isWS && <Chip size="small" color="primary" label="Wind & Seismic" sx={{ mr: 0.5 }} />}
+//                       {isFire && <Chip size="small" color="error" label="Fire" />}
+//                       {!isWS && !isFire && <span style={{ color: '#9ca3af' }}>—</span>}
+//                     </td>
+//                   </tr>
+//                 );
+//               })}
+//             </tbody>
+//           </table>
+//         </Box>
+//         <CalculationFormula caption="Adjustment factors (vs baseline wL²/8 & wL²/2) / 中部/底部/火灾调整系数" highlight
+//           formula={`k_{mid} = \\frac{${tx(wsF.mid, 4)}}{1/8} = ${tx(sc.wsMidAdjust, 3)},\\qquad k_{base} = \\frac{${tx(wsF.base, 4)}}{1/8} = ${tx(sc.wsBaseAdjust, 3)},\\qquad k_{fire} = \\frac{${tx(fF.base, 4)}}{1/2} = ${tx(sc.fireAdjust, 3)}`} />
+//         <CalculationFormula caption="Mid-height design moment / 中部设计弯矩 (incl. support factor & additional loads)" highlight
+//           formula={`M_a = \\max(M_E,M_W)\\,k_{mid} + \\Delta M_{add,mid} = \\max(${tx(oopResult.ME)},${tx(oopResult.MW)})\\times${tx(sc.wsMidAdjust, 3)}+${tx(safe(add.M_add_mid_F) + safe(add.M_add_mid_M))} = ${tx(oopResult.Ma)}\\,\\mathrm{kN\\cdot m/m}`} />
+//       </CalculationSubsection>
+//       <CalculationSubsection title="5.4 Flexural capacity · 抗弯承载力">
+//         <CalculationFormula caption="Steel tension / 钢筋拉力"
+//           formula={`T_s = L_w A_{WV} f_y/1000 = ${tx(oopResult.Ts)}\\,\\mathrm{kN}`} />
+//         <CalculationFormula caption="Stress block depth / 应力块高度"
+//           formula={`a = \\frac{T_s\\times1000}{0.85 f'_c L_w\\times1000} = ${tx(oopResult.a, 1)}\\,\\mathrm{mm},\\qquad d = 0.5t_w = ${tx(oopResult.d, 0)}\\,\\mathrm{mm}`} />
+//         <CalculationFormula caption="Flexural capacity / 抗弯承载力" highlight
+//           formula={`\\phi M_n = 0.85\\,A_{WV}f_y\\left(d-\\frac{a}{2}\\right)/10^6 = ${tx(oopResult.phiMn)}\\,\\mathrm{kN\\cdot m/m}`} />
+//       </CalculationSubsection>
+//       <CalculationSubsection title="5.5 P-Delta mid-height check (UR1) · P-Δ 中部验算">
+//         <CalculationFormula caption="Concrete modulus / 混凝土弹性模量"
+//           formula={`E_c = 3320\\sqrt{f'_c}+6900 = ${tx(oopResult.Ec, 0)}\\,\\mathrm{MPa}`} />
+//         <CalculationFormula caption="Equivalent steel area / 换算钢筋面积"
+//           formula={`A_{se} = \\frac{N_{GE}\\times1000 + A_{WV}f_y}{f_y} = ${tx(oopResult.Ase, 0)}\\,\\mathrm{mm^2/m}`} />
+//         <CalculationFormula caption="Cracked second moment / 开裂截面惯性矩"
+//           formula={`I_{cr} = nA_{se}(d-kd)^2 + \\frac{(kd)^3}{3} = ${tx(oopResult.Icr, 0)}\\,\\mathrm{mm^4/m}`} />
+//         <CalculationFormula caption="P-Δ magnified moment / P-Δ 放大弯矩" highlight
+//           formula={`M' = \\frac{M_a}{1-\\dfrac{5N_a h_{roof}^2}{0.75\\times48\\,E_c I_{cr}}} = \\frac{${tx(oopResult.Ma)}}{1-\\dfrac{5\\times${tx(oopResult.Na)}\\times${tx(hroofEff * 1000, 0)}^2}{0.75\\times48\\times${tx(oopResult.Ec, 0)}\\times${tx(oopResult.Icr, 0)}}} = ${tx(oopResult.M_prime)}\\,\\mathrm{kN\\cdot m/m}`} />
+//         <CalculationFormula caption="Ultimate deflection / 极限挠度"
+//           formula={`\\Delta_u = \\frac{5M' h_{roof}^2}{0.75\\times48\\,E_c I_{cr}} = \\frac{5\\times${tx(oopResult.M_prime)}\\times${tx(hroofEff * 1000, 0)}^2}{0.75\\times48\\times${tx(oopResult.Ec, 0)}\\times${tx(oopResult.Icr, 0)}} = ${tx(oopResult.delta_u, 1)}\\,\\mathrm{mm}`} />
+//         <CalculationFormula caption="Mid-height utilisation / 中部利用率" highlight
+//           formula={`UR_1 = \\frac{M'}{\\phi M_n} = ${txUR(oopResult.UR1)} = ${txPct(oopResult.UR1)}\\%`}
+//           status={mkStatus(Number.isFinite(oopResult.UR1) && oopResult.UR1 <= 1, 'PASS', 'CHECK')} />
+//       </CalculationSubsection>
+//       <CalculationSubsection title="5.6 Base moment check (UR2) · 底部弯矩验算">
+//         <CalculationFormula caption="Base moments (incl. support factor & additional loads) / 底部弯矩"
+//           formula={`M_{bE} = \\frac{W_E(h^2-2a^2)}{8}k_{base} + \\Delta M_{add,base} = \\frac{${tx(oopResult.WE)}\\times(${tx(hroofEff)}^2-2\\times${tx(baseLeverArm)}^2)}{8}\\times${tx(sc.wsBaseAdjust, 3)}+${tx(safe(add.M_add_base_F) + safe(add.M_add_base_M))} = ${tx(oopResult.MbE)}\\,\\mathrm{kN\\cdot m/m}`} />
+//         <CalculationFormula caption="Wind base moment / 风底部弯矩"
+//           formula={`M_{bW} = \\frac{W_{pressure}(h^2-2a^2)}{8}k_{base} + \\Delta M_{add,base} = \\frac{${tx(oopResult.WindPressure)}\\times(${tx(hroofEff)}^2-2\\times${tx(baseLeverArm)}^2)}{8}\\times${tx(sc.wsBaseAdjust, 3)}+${tx(safe(add.M_add_base_F) + safe(add.M_add_base_M))} = ${tx(oopResult.MbW)}\\,\\mathrm{kN\\cdot m/m}`} />
+//         <CalculationFormula caption="Base utilisation / 底部利用率" highlight
+//           formula={`UR_2 = \\frac{\\max(M_{bE},M_{bW})}{\\phi M_n} = ${txUR(oopResult.UR2)} = ${txPct(oopResult.UR2)}\\%`}
+//           status={mkStatus(Number.isFinite(oopResult.UR2) && oopResult.UR2 <= 1, 'PASS', 'CHECK')} />
+//       </CalculationSubsection>
+//       <CalculationSubsection title="5.7 Fire check (UR3) · 火灾验算 (support: Fire option)">
+//         <CalculationFormula caption="Axis distance / 钢筋轴向距离"
+//           formula={`x_t = \\frac{t_w}{2}-\\frac{\\phi_v}{2}-\\phi_h = ${tx(oopResult.xt, 1)}\\,\\mathrm{mm}`} />
+//         <CalculationFormula caption="Reduction factors / 温度折减系数"
+//           formula={`\\eta_x = 0.16\\ln(t_h x_t^{-2})-0.65 = ${tx(oopResult.etax, 3)},\\qquad \\eta_w = 1-0.162\\,t_h^{-0.6} = ${tx(oopResult.etaw, 3)}`} />
+//         <CalculationFormula caption="Steel temperature & reduced yield / 钢筋温度与折减屈服"
+//           formula={`T_{fs} = \\eta_x\\eta_w\\times660 = ${tx(oopResult.Tfs, 0)}\\,^{\\circ}\\mathrm{C},\\qquad f_{yt} = \\frac{720-T_{fs}}{470}f_y\\,(clamped) = ${tx(oopResult.fyt, 0)}\\,\\mathrm{MPa}`} />
+//         <CalculationFormula caption="Fire moment (wL²/2 × k_fire) / 火灾弯矩"
+//           formula={`M_{bf} = \\frac{w_f(H_w-t_f)^2}{2}\\,k_{fire} = \\frac{${tx(inputs.wf)}\\times(${tx(HwMinusTf)})^2}{2}\\times${tx(sc.fireAdjust, 3)} = ${tx(oopResult.Mbf)}\\,\\mathrm{kN\\cdot m/m}`} />
+//         <CalculationFormula caption="Fire utilisation / 火灾利用率" highlight
+//           formula={`UR_3 = \\frac{M_{bf}}{\\phi M_{n,fire}} = ${txUR(oopResult.UR3)} = ${txPct(oopResult.UR3)}\\%`}
+//           status={mkStatus(Number.isFinite(oopResult.UR3) && oopResult.UR3 <= 1, 'PASS', 'CHECK')} />
+//       </CalculationSubsection>
+//       <CalculationSubsection title="5.8 OOP shear (UR4) · 平面外抗剪">
+//         <CalculationFormula caption="Seismic shear / 地震剪力"
+//           formula={`V_E = \\frac{5}{8}W_E(H_w-t_f)+F_{add} = \\frac{5}{8}\\times${tx(oopResult.WE)}\\times${tx(HwMinusTf)}+${tx(add.F_add)} = ${tx(oopResult.VE)}\\,\\mathrm{kN/m}`} />
+//         <CalculationFormula caption="Wind shear / 风剪力"
+//           formula={`V_w = \\frac{5}{8}W_{pressure}(H_w-t_f)+F_{add} = \\frac{5}{8}\\times${tx(oopResult.WindPressure)}\\times${tx(HwMinusTf)}+${tx(add.F_add)} = ${tx(oopResult.Vw)}\\,\\mathrm{kN/m}`} />
+//         <CalculationFormula caption="Concrete shear contribution / 混凝土抗剪贡献"
+//           formula={`V_c = \\left(0.25\\sqrt{f'_c}+\\frac{N'}{4A_g}\\right)\\frac{d}{1000} = \\left(0.25\\sqrt{${tx(inputs.fc)}}+\\frac{${tx(oopResult.Na)}}{4\\times${tx(oopResult.Ag, 0)}}\\right)\\times\\frac{${tx(oopResult.d, 0)}}{1000} = ${tx(oopResult.Vc)}\\,\\mathrm{kN/m}`} />
+//         <CalculationFormula caption="Horizontal steel contribution / 水平筋抗剪贡献"
+//           formula={`V_s = \\frac{A_{wh}f_y d}{s_h\\times1000} = \\frac{${tx(oopResult.AWH, 1)}\\times${tx(inputs.fy)}\\times${tx(oopResult.d, 0)}}{${tx(inputs.HbarSpace, 0)}\\times1000} = ${tx(oopResult.Vs)}\\,\\mathrm{kN/m}`} />
+//         <CalculationFormula caption="Shear utilisation / 抗剪利用率" highlight
+//           formula={`UR_4 = \\frac{\\max(V_E,V_w)}{0.75(V_c+V_s)} = \\frac{\\max(${tx(oopResult.VE)},${tx(oopResult.Vw)})}{0.75(${tx(oopResult.Vc)}+${tx(oopResult.Vs)})} = ${txUR(oopResult.UR4)} = ${txPct(oopResult.UR4)}\\%`}
+//           status={mkStatus(Number.isFinite(oopResult.UR4) && oopResult.UR4 <= 1, 'PASS', 'CHECK')} />
+//       </CalculationSubsection>
+//     </CalculationSection>
+//   );
+// }
+
+
+/* ============================================================================
+5. OUT-OF-PLANE DESIGN (WIND & SEISMIC) - 拆分自原 OutOfPlaneBlock
+========================================================================== */
+function OutOfPlaneWindSeismicBlock({ inputs, outOfPlane }) {
+const oopResult = outOfPlane || {};
+const hv = oopResult.hroofValidation || {};
+const sc = oopResult.supportConditions || {};
+const add = oopResult.additionalLoads || {};
+const ps = oopResult.partSeismic || {};
+const wsF = sc.windSeismicFactors || { mid: 1 / 8, base: 1 / 8 };
+const hroofEff = safe(hv.hroofEffective);
+
+return (
+ <CalculationSection number="5" title="Out-of-Plane Design (Wind & Seismic) · 平面外设计（风与地震）" chip={<Chip size="small" label="AS/NZS 1170.5 Ch.8 / NZS 3101" />}>
+   
+   <CalculationSubsection title="5.1 hroof validation & Lateral Actions · hroof 校验与水平作用">
+     <CalculationFormula caption="Effective hroof used / 实际采用值" highlight
+       formula={`h_{roof,eff} = \\min(h_{roof},\\,h_{roof,max}) = ${tx(hv.hroofEffective)}\\,\\mathrm{m}`}
+       status={mkStatus(hv.hroofValid, 'VALID', 'CLAMPED')} />
+     <CalculationFormula caption="Part height amplification factor H / part 高度放大系数 (§8.4.2.3)"
+       formula={`H = 1 + 2\\frac{h_x}{h_n} = 1 + 2\\times\\frac{${tx(ps.hx)}}{${tx(ps.hn)}} = ${tx(ps.H, 3)}`} />
+     <CalculationFormula caption="Wall panel weight Wp / 墙板重量（每延米）"
+       formula={`W_p = \\gamma_c\\,t_w\\,h_{roof} = ${tx(ps.Wp)}\\,\\mathrm{kN/m}`} />
+     <CalculationFormula caption="Part component factor Cp / Part 构件系数 (§8.4.2.1)"
+       formula={`C_p = \\frac{a_p\\,S_p}{R_p\\,\\mu_p} = ${tx(ps.Cp, 3)}`} />
+     <CalculationFormula caption="Design seismic force Fp,design / 控制设计地震力" highlight
+       formula={`F_{p,design} = \\max(C_p H W_p,\\,0.3 S_p I W_p) = ${tx(ps.Fp_design)}\\,\\mathrm{kN/m}`} />
+     <CalculationFormula caption="OOP seismic pressure WE / 平面外地震压力"
+       formula={`W_E = \\frac{F_{p,design}}{h_{roof}} = ${tx(oopResult.WE)}\\,\\mathrm{kPa}`} />
+     <CalculationFormula caption="Governing wind pressure / 控制风压"
+       formula={`W_{pressure} = \\max(w_{wd},\\,w_{wf}) = ${tx(oopResult.WindPressure)}\\,\\mathrm{kPa}`} />
+   </CalculationSubsection>
+
+   <CalculationSubsection title="5.2 Bending Moments & Support Conditions · 弯矩与支承条件">
+     <Box sx={{ overflowX: 'auto', mb: 1.5 }}>
+       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+         <thead>
+           <tr>
+             {['Support condition', 'Mid-height k', 'Base k', 'Assigned to'].map(hd => (
+               <th key={hd} style={{ textAlign: 'left', padding: '6px 10px', borderBottom: '2px solid #e5e7eb', fontWeight: 800 }}>{hd}</th>
+             ))}
+           </tr>
+         </thead>
+         <tbody>
+           {SUPPORT_MOMENT_TABLE.map(row => {
+             const isWS = (sc.windSeismic || 'Pinned-Pinned') === row.key;
+             return (
+               <tr key={row.key} style={{ background: isWS ? '#f0f7ff' : 'transparent' }}>
+                 <td style={{ padding: '6px 10px', borderBottom: '1px solid #eee', fontWeight: 600 }}>{row.label}</td>
+                 <td style={{ padding: '6px 10px', borderBottom: '1px solid #eee' }}>{row.mid}</td>
+                 <td style={{ padding: '6px 10px', borderBottom: '1px solid #eee' }}>{row.base}</td>
+                 <td style={{ padding: '6px 10px', borderBottom: '1px solid #eee' }}>
+                   {isWS && <Chip size="small" color="primary" label="Wind & Seismic" />}
+                   {!isWS && <span style={{ color: '#9ca3af' }}>—</span>}
+                 </td>
+               </tr>
+             );
+           })}
+         </tbody>
+       </table>
+     </Box>
+     <CalculationFormula caption="Mid-height design moment Ma / 中部设计弯矩" highlight
+       formula={`M_a = \\max(M_E,M_W)\\,k_{mid} + \\Delta M_{add,mid} = ${tx(oopResult.Ma)}\\,\\mathrm{kN\\cdot m/m}`} />
+     <CalculationFormula caption="Base design moments MbE, MbW / 底部设计弯矩"
+       formula={`M_{bE} = ${tx(oopResult.MbE)}\\,\\mathrm{kN\\cdot m/m},\\quad M_{bW} = ${tx(oopResult.MbW)}\\,\\mathrm{kN\\cdot m/m}`} />
+   </CalculationSubsection>
+
+   <CalculationSubsection title="5.3 Flexural Capacity & P-Delta · 抗弯承载力与 P-Δ 效应">
+     <CalculationFormula caption="Flexural capacity φMn / 抗弯承载力" highlight
+       formula={`\\phi M_n = 0.85\\,A_{WV}f_y\\left(d-\\frac{a}{2}\\right)/10^6 = ${tx(oopResult.phiMn)}\\,\\mathrm{kN\\cdot m/m}`} />
+     <CalculationFormula caption="P-Delta magnified moment M' / P-Δ 放大弯矩" highlight
+       formula={`M' = \\frac{M_a}{1-\\dfrac{5N_a h_{roof}^2}{0.75\\times48\\,E_c I_{cr}}} = ${tx(oopResult.M_prime)}\\,\\mathrm{kN\\cdot m/m}`} />
+     <CalculationFormula caption="Mid-height utilisation UR1 / 中部利用率" highlight
+       formula={`UR_1 = \\frac{M'}{\\phi M_n} = ${txPct(oopResult.UR1)}\\%`}
+       status={mkStatus(Number.isFinite(oopResult.UR1) && oopResult.UR1 <= 1, 'PASS', 'CHECK')} />
+     <CalculationFormula caption="Base utilisation UR2 / 底部利用率" highlight
+       formula={`UR_2 = \\frac{\\max(M_{bE},M_{bW})}{\\phi M_n} = ${txPct(oopResult.UR2)}\\%`}
+       status={mkStatus(Number.isFinite(oopResult.UR2) && oopResult.UR2 <= 1, 'PASS', 'CHECK')} />
+   </CalculationSubsection>
+
+   <CalculationSubsection title="5.4 Shear Capacity · 抗剪承载力">
+     <CalculationFormula caption="Shear utilisation UR4 / 抗剪利用率" highlight
+       formula={`UR_4 = \\frac{\\max(V_E,V_w)}{0.75(V_c+V_s)} = ${txPct(oopResult.UR4)}\\%`}
+       status={mkStatus(Number.isFinite(oopResult.UR4) && oopResult.UR4 <= 1, 'PASS', 'CHECK')} />
+   </CalculationSubsection>
+
+ </CalculationSection>
+);
+}
+
+/* ============================================================================
+6. OUT-OF-PLANE FIRE RESISTANCE DESIGN - 拆分自原 OutOfPlaneBlock
+========================================================================== */
+function OutOfPlaneFireBlock({ inputs, outOfPlane }) {
+const oopResult = outOfPlane || {};
+const sc = oopResult.supportConditions || {};
+const HwMinusTf = safe(inputs.wallHeight) - safe(inputs.tf) / 1000;
+
+return (
+ <CalculationSection number="6" title="Out-of-Plane Fire Resistance Design · 平面外抗火设计" chip={<Chip size="small" label="NZS 3101 / BRANZ Guide" />}>
+   
+   <CalculationSubsection title="6.1 Fire Actions & Material Properties · 火灾作用与材料折减">
+     <CalculationFormula caption="Axis distance xt / 钢筋轴向距离"
+       formula={`x_t = \\frac{t_w}{2}-\\frac{\\phi_v}{2}-\\phi_h = ${tx(oopResult.xt, 1)}\\,\\mathrm{mm}`} />
+     <CalculationFormula caption="Reduction factors / 温度折减系数"
+       formula={`\\eta_x = 0.16\\ln(t_h x_t^{-2})-0.65 = ${tx(oopResult.etax, 3)},\\qquad \\eta_w = 1-0.162\\,t_h^{-0.6} = ${tx(oopResult.etaw, 3)}`} />
+     <CalculationFormula caption="Steel temperature & reduced yield / 钢筋温度与折减屈服"
+       formula={`T_{fs} = \\eta_x\\eta_w\\times660 = ${tx(oopResult.Tfs, 0)}\\,^{\\circ}\\mathrm{C},\\qquad f_{yt} = ${tx(oopResult.fyt, 0)}\\,\\mathrm{MPa}`} />
+   </CalculationSubsection>
+
+   <CalculationSubsection title="6.2 Fire Moment & Capacity · 火灾弯矩与承载力">
+     <CalculationFormula caption="Fire moment Mbf / 火灾弯矩 (Support: Fire option)"
+       formula={`M_{bf} = \\frac{w_f(H_w-t_f)^2}{2}\\,k_{fire} = ${tx(oopResult.Mbf)}\\,\\mathrm{kN\\cdot m/m}`} />
+     <CalculationFormula caption="Fire utilisation UR3 / 火灾利用率" highlight
+       formula={`UR_3 = \\frac{M_{bf}}{\\phi M_{n,fire}} = ${txPct(oopResult.UR3)}\\%`}
+       status={mkStatus(Number.isFinite(oopResult.UR3) && oopResult.UR3 <= 1, 'PASS', 'CHECK')} />
+   </CalculationSubsection>
+
+ </CalculationSection>
+);
 }
 
 /* ---------------------------------------------------------------------------
@@ -1331,9 +1460,6 @@ function CalculationTab({ inputs, results }) {
   const ResultSummary = results.summary || {};
   return (
     <Box>
-      <Alert severity="info" sx={{ mb: 2 }}>
-        Calculation steps displayed in sectional KaTeX blocks.
-      </Alert>
       <Alert severity={ResultSummary.overallPass ? 'success' : 'warning'} sx={{ mb: 2, fontWeight: 700 }}>
         {ResultSummary.overallPass
           ? '✓ All implemented checks pass under current inputs. (当前输入下全部检查通过。)'
@@ -1346,15 +1472,19 @@ function CalculationTab({ inputs, results }) {
       <InPlaneSeismicBlock inputs={inputs} inPlane={ResultInPlane} ResoutOfPlane={ResultOutOfPlane}/>
       <InPlaneActionsBlock inputs={inputs} inPlane={ResultInPlane} />
       <InPlaneChecksBlock inputs={inputs} inPlane={ResultInPlane} />
-      <OutOfPlaneBlock inputs={inputs} outOfPlane={ResultOutOfPlane} />
+      {/* <OutOfPlaneBlock inputs={inputs} outOfPlane={ResultOutOfPlane} /> */}
+      {/* 拆分后的平面外设计：风与地震 */}
+      <OutOfPlaneWindSeismicBlock inputs={inputs} outOfPlane={ResultOutOfPlane} />
+      {/* 拆分后的平面外设计：抗火 */}
+      <OutOfPlaneFireBlock inputs={inputs} outOfPlane={ResultOutOfPlane} />
       <ConnectionBlock inputs={inputs} connection={ResultConnection} />
       <FoundationBlock inputs={inputs} inPlane={ResultInPlane} outOfPlane={ResultOutOfPlane} foundation={ResultFoundation} />
       <UtilisationSummaryBlock inPlane={ResultInPlane} outOfPlane={ResultOutOfPlane} connection={ResultConnection} foundation={ResultFoundation} />
-      <Alert severity="warning" sx={{ mt: 1 }}>
+      {/* <Alert severity="warning" sx={{ mt: 1 }}>
         The formulas above reflect the actual calculation engine implementation. Final design must be
         verified against NZS 3101, AS/NZS 1170 series and project-specific requirements by a qualified engineer.
         （以上公式为计算引擎实际实现的公式。最终设计必须由合格工程师按规范及项目要求复核。）
-      </Alert>
+      </Alert> */}
     </Box>
   );
 }
@@ -1385,11 +1515,11 @@ function ResultsTab({ inputs, results }) {
         </Typography>
         <PrecastPanelSVG inputs={inputs} results={results} />
       </Paper>
-      {summary.hroofWarning && (
+      {/* {summary.hroofWarning && (
         <Alert severity="warning" sx={{ mb: 2 }}>
           hroof clamped to {fmt(outOfPlane.hroofValidation?.hroofEffective, 2)} m.
         </Alert>
-      )}
+      )} */}
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>In-Plane Design Summary</Typography>
         <ResultRow label="N (Compression)" value={fmt(inPlane.sectionActions?.NseismicCompression, 2)} unit="kN" />
@@ -1684,25 +1814,20 @@ export default function PrecastPanel() {
               </Typography>
             </Box>
             <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-              <Chip
-                label={statusLabel}
-                color={statusColor}
+              <Chip label={statusLabel} color={statusColor}
                 icon={results.summary?.overallPass ? <CheckCircleIcon /> : <WarningAmberIcon />}
                 sx={{ fontWeight: 800 }}
               />
-              {/* v0.6.1 —— 原 "PDF Report" 改名为 "Summary Report" */}
+              {/* "Summary Report" 按钮 */}
               <Button variant="contained" size="small" startIcon={<PictureAsPdfIcon />}
-                onClick={() => setReportOpen(true)}>
-                Summary Report
+                onClick={() => setReportOpen(true)}> Summary Report
               </Button>
-              {/* v0.6.1 —— 新增 "Detail Report" 按钮 */}
+              {/* "Detail Report" 按钮 */}
               <Button variant="contained" size="small" color="secondary" startIcon={<PictureAsPdfIcon />}
-                onClick={() => setDetailReportOpen(true)}>
-                Detail Report
+                onClick={() => setDetailReportOpen(true)}> Detail Report
               </Button>
               <Button variant="outlined" size="small" startIcon={<RestartAltIcon />} 
-                onClick={handleReset}>
-                Reset
+                onClick={handleReset}> Reset
               </Button>
             </Stack>
           </Stack>
