@@ -357,6 +357,37 @@ export function calculateInPlaneDesign(input = {}) {
   const I = tmm * Math.pow(bmm, 3) / 12;
   const Zg = tmm * Math.pow(bmm, 2) / 6;
 
+  /* ------------------------------------------------------------------------
+   * Geometry classification. Slenderness
+   * ---------------------------------------------------------------------- */
+
+  const aspectRatio = bwall > 0 ? hwall / bwall : 0;
+  const outOfPlaneSlenderness = twall > 0 ? hwall / twall : 0;
+
+  let wallClassification = 'Intermediate wall';
+
+  if (aspectRatio < 1) { wallClassification = 'Squat wall';
+  } else if (aspectRatio > 2) { wallClassification = 'Slender wall' }
+
+  /* ------------------------------------------------------------------------
+   * Reinforcement.
+   * ---------------------------------------------------------------------- */
+
+  const VbarDia = positive(input.VbarDia);
+  const VbarSpace = positive(input.VbarSpace);
+  const HbarDia = positive(input.HbarDia);
+  const HbarSpace = positive(input.HbarSpace);
+  const vBarArea = areaBar(VbarDia);
+  const hBarArea = areaBar(HbarDia);
+  const nVerticalBars = VbarSpace > 0 ? Math.floor(bmm / VbarSpace) + 1 : 0;
+  const AsDistributed = nVerticalBars * vBarArea;
+  const rhoVertical = Ag > 0 ? AsDistributed / Ag : 0;
+  const AsHorizontalPerM = HbarSpace > 0 ? hBarArea * 1000 / HbarSpace : 0;
+  const AsBoundary = positive(input.boundaryBarCount) * areaBar( positive(input.boundaryBarDiameter));
+  const boundaryArea = positive(input.boundaryWidth) * 1000 * positive(input.boundaryThickness, twall) * 1000;
+  const rhoBoundary = boundaryArea > 0 ? AsBoundary / boundaryArea : 0;
+  const boundarySteelTensionCapacity = AsBoundary * fy / 1000;
+
   /* Self weight */
   const Gwall = densityConcrete * twall * hwall * bwall;
   const GwallPerM = bwall > 0 ? Gwall / bwall : 0;
@@ -425,17 +456,7 @@ export function calculateInPlaneDesign(input = {}) {
   const Ncompression = Ngravity/2 + Mtotal / leverArm;
   const Ntension = Ngravity/2 - Mtotal / leverArm;
 
-  /* ------------------------------------------------------------------------
-   * Geometry classification. Slenderness
-   * ---------------------------------------------------------------------- */
 
-  const aspectRatio = bwall > 0 ? hwall / bwall : 0;
-  const outOfPlaneSlenderness = twall > 0 ? hwall / twall : 0;
-
-  let wallClassification = 'Intermediate wall';
-
-  if (aspectRatio < 1) { wallClassification = 'Squat wall';
-  } else if (aspectRatio > 2) { wallClassification = 'Slender wall' }
 
   /* ------------------------------------------------------------------------
    * Lintel bearing.
@@ -454,24 +475,7 @@ export function calculateInPlaneDesign(input = {}) {
 
   const bearingRatio = bearingCapacity > 0 ? bearingStress / bearingCapacity : lintelReaction > 0 ? Infinity : 0;
 
-  /* ------------------------------------------------------------------------
-   * Reinforcement.
-   * ---------------------------------------------------------------------- */
 
-  const VbarDia = positive(input.VbarDia);
-  const VbarSpace = positive(input.VbarSpace);
-  const HbarDia = positive(input.HbarDia);
-  const HbarSpace = positive(input.HbarSpace);
-  const vBarArea = areaBar(VbarDia);
-  const hBarArea = areaBar(HbarDia);
-  const nVerticalBars = VbarSpace > 0 ? Math.floor(bmm / VbarSpace) + 1 : 0;
-  const AsDistributed = nVerticalBars * vBarArea;
-  const rhoVertical = Ag > 0 ? AsDistributed / Ag : 0;
-  const AsHorizontalPerM = HbarSpace > 0 ? hBarArea * 1000 / HbarSpace : 0;
-  const AsBoundary = positive(input.boundaryBarCount) * areaBar( positive(input.boundaryBarDiameter));
-  const boundaryArea = positive(input.boundaryWidth) * 1000 * positive(input.boundaryThickness, twall) * 1000;
-  const rhoBoundary = boundaryArea > 0 ? AsBoundary / boundaryArea : 0;
-  const boundarySteelTensionCapacity = AsBoundary * fy / 1000;
 
   /* ------------------------------------------------------------------------
    * Boundary element N-M.
@@ -563,6 +567,20 @@ export function calculateInPlaneDesign(input = {}) {
   return {
     geometry: { bwall, hwall, twall, Ag, I, Zg },
 
+    reinforcement: {
+      nVerticalBars, vBarArea, hBarArea,
+      AsDistributed,
+      rhoVertical,
+      AsHorizontalPerM,
+      AsBoundary,
+      boundaryArea,
+      rhoBoundary,
+      boundarySteelTensionCapacity,
+      d: boundaryNM.available
+        ? boundaryNM.section.d
+        : 0
+    },    
+
     gravity: {
       Gwall,
       GwallPerM,
@@ -635,21 +653,6 @@ export function calculateInPlaneDesign(input = {}) {
       bearingRatio
     },
 
-    reinforcement: {
-      nVerticalBars,
-      vBarArea,
-      hBarArea,
-      AsDistributed,
-      rhoVertical,
-      AsHorizontalPerM,
-      AsBoundary,
-      boundaryArea,
-      rhoBoundary,
-      boundarySteelTensionCapacity,
-      d: boundaryNM.available
-        ? boundaryNM.section.d
-        : 0
-    },
 
     interaction: {
       compressionConcrete: boundaryNM.available
