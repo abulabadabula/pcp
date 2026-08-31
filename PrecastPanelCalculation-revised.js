@@ -450,7 +450,7 @@ export function calculateInPlaneDesign(input = {}) {
   const sigmaMin = sigmaN - sigmaM;
 
   const eccentricity = Ngravity > 0 ? Mtotal / Ngravity : 0;
-  const kern = bwall / 2;
+  const kern = bwall / 6;
   const compareEcc = Math.abs(eccentricity) <= kern ? 'within kern' : 'outside kern';
   const leverArm = bwall / 3 * 2;
   const Ncompression = Ngravity/2 + Mtotal / leverArm;

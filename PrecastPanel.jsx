@@ -729,77 +729,613 @@ function InPlaneActionsBlock({ inputs, inPlane }) {
    5. In-Plane Section Checks（平面内截面验算）Calculation Tab调用
 --------------------------------------------------------------------------- */
 function InPlaneChecksBlock({ inputs, inPlane }) {
+
   const geo = inPlane.geometry || {};
   const gravity = inPlane.gravity || {};
   const sectionactions = inPlane.sectionActions || {};
   const es = inPlane.elasticStress || {};
-
-  const be = inPlane.bearing || {};
   const re = inPlane.reinforcement || {};
-  const it = inPlane.interaction || {};
   const sh = inPlane.shear || {};
   const ch = inPlane.checks || {};
 
-  const minBlock = Math.min(safe(re.d), safe(inputs.boundaryWidth) * 1000);
+  const lw = safe(geo.bwall || inputs.wallWidth); // m
+  const tw = safe(geo.twall || inputs.wallThickness); // m
+  const L = lw * 1000; // mm, wall length / bending depth
+  const t = tw * 1000; // mm, wall thickness / compression width
+
+  /*
+   * Design axial force, moment and shear
+   */
+  const Nstar = safe(sectionactions.Ntotal || gravity.Ngravity); // kN
+  const Mstar = safe(sectionactions.Mtotal); // kN.m
+  const Vstar = safe(sectionactions.Vtotal); // kN
+
+  /* ========================================================================
+     MATERIAL PROPERTIES
+  ========================================================================= */
+
+  const fc = safe(inputs.fc); // MPa
+  const fy = safe(inputs.fy); // MPa
+  const Es = 200000; // MPa
+  const epsCu = 0.003;
+
+  /*
+   * Equivalent rectangular compression block
+   *
+   * For normal-strength concrete:
+   * alpha1 = 0.85
+   * beta1  = 0.85
+   *
+   * These can later be replaced with exact NZS 3101
+   * strength-dependent parameters if desired.
+   */
+
+  const alpha1 = 0.85;
+  const beta1 = 0.85;
+
+  /*
+   * Strength reduction factor
+   */
+
+  const phiFlexure = safe(inputs.phiFlexure, 0.85);
+
+  /* ========================================================================
+     SECTION GEOMETRY
+  ========================================================================= */
+
+  const Ag = geo.Ag; // mm2
+  const Zg = geo.Zg; // mm3
+  const Ig = geo.I; // mm4
+
+  const eccentricity = es.eccentricity; // m
+
+  /*
+   * Rectangular section kern:
+   *
+   * e <= L/6 → entire section compression
+   * e >  L/6 → tensile stress occurs
+   */
+  const kernLimit = lw / 6; // m
+  const cracked = eccentricity > kernLimit;
+
+  /*
+   * Elastic stress
+   */
+
+  const sigmaN = es.sigmaN;
+  const sigmaM = es.sigmaM;
+  const sigmaMax = es.sigmaMax;
+  const sigmaMin = es.sigmaMin;
+
+  /* ========================================================================
+     BUILD VERTICAL REINFORCEMENT LAYOUT
+     
+     Coordinate system:
+     
+     x = 0        compression edge
+     x = L        tension edge
+     
+     Distributed vertical bars:
+     placed across entire wall length
+     
+     Boundary bars:
+     added at both ends
+  ========================================================================= */
+
+  const cover = safe(inputs.cover); // mm
+  const VbarDia = safe(inputs.VbarDia); // mm
+  const VbarSpace = safe(inputs.VbarSpace); // mm
+  const boundaryBarCount = Math.round(safe(inputs.boundaryBarCount));
+  const boundaryBarDia = safe(inputs.boundaryBarDiameter); // mm
+  const boundaryWidth = safe(inputs.boundaryWidth) * 1000; // mm
+
+  /*
+   * Distributed vertical reinforcement
+   */
+
+  const AsDistributedBar = Math.PI * Math.pow(VbarDia, 2) / 4;
+
+  /*
+   * Boundary reinforcement
+   */
+
+  const AsBoundaryBar = Math.PI * Math.pow(boundaryBarDia, 2) / 4;
+  const bars = [];
+
+  /*
+   * ------------------------------------------------------------
+   * Distributed vertical reinforcement
+   * ------------------------------------------------------------
+   */
+
+  if (VbarDia > 0 && VbarSpace > 0 && L > 0) {
+    const nBars = Math.max(2, Math.floor((L - 2 * cover) / VbarSpace) + 1);
+    for (let i = 0; i < nBars; i++) {
+      const x = nBars === 1 ? L / 2 : cover + i * ((L - 2 * cover) / (nBars - 1));
+      bars.push({ x, As: AsDistributedBar, type: 'distributed' });
+    }
+  }
+
+  /*
+   * ------------------------------------------------------------
+   * Boundary reinforcement
+   *
+   * Split total boundary bars equally between two wall ends.
+   *
+   * If odd number:
+   * extra bar assigned to compression-side boundary.
+   * ------------------------------------------------------------
+   */
+
+  if (boundaryBarCount > 0 && boundaryBarDia > 0) {
+    const nLeft = Math.ceil(boundaryBarCount / 2);
+    const nRight = Math.floor(boundaryBarCount / 2);
+
+    /*
+     * Approximate bar spacing inside boundary zone
+     */
+
+    const availableBoundaryWidth = Math.max(boundaryWidth - 2 * cover, boundaryBarDia);
+
+    /*
+     * Left boundary
+     */
+
+    for (let i = 0; i < nLeft; i++) {
+      const spacing = nLeft > 1 ? availableBoundaryWidth / (nLeft - 1) : 0;
+      const x = Math.min(cover + i * spacing, L - cover);
+      bars.push({ x, As: AsBoundaryBar, type: 'boundary-left' });
+    }
+
+    /*
+     * Right boundary
+     */
+
+    for (let i = 0; i < nRight; i++) {
+      const spacing = nRight > 1 ? availableBoundaryWidth / (nRight - 1) : 0;
+      const x = Math.max(cover, L - cover - i * spacing);
+      bars.push({ x, As: AsBoundaryBar, type: 'boundary-right' });
+    }
+  }
+
+  /*
+   * Total reinforcement
+   */
+
+  const AsTotal = bars.reduce((sum, bar) => sum + bar.As, 0);
+
+  /* ========================================================================
+     STRAIN COMPATIBILITY SECTION SOLVER
+
+     For a trial neutral axis depth c:
+
+                  Compression
+                     │
+                     ▼
+           ┌─────────────────┐
+           │████████         │
+           │████████         │ ← compression block a
+           │████████         │
+           │                 │
+           │       NA        │ ← c
+           │                 │
+           │                 │
+           │                 │
+           └─────────────────┘
+                     ▲
+                     │
+                  Tension
+
+     Strain:
+     εs = εcu (1 - x/c)
+     Stress:
+     fs = Es εs
+     limited:
+     -fy ≤ fs ≤ fy
+  ========================================================================= */
+
+  function evaluateSection(c) {
+
+    /*
+     * Limit compression block
+     */
+
+    const a = Math.min(beta1 * c, L);
+
+    /*
+     * Concrete compression force
+     *
+     * Cc = alpha1 fc b a
+     *
+     * MPa × mm × mm = N
+     */
+    const Cc = alpha1 * fc * t * a;
+
+    /*
+     * Compression block resultant
+     */
+
+    const xCc = a / 2;
+    let steelAxial = 0;
+    let steelMomentAboutEdge = 0;
+
+    const steelResults = [];
+
+    bars.forEach(bar => {
+
+      /*
+       * Positive strain = compression
+       *
+       * x < c → compression
+       * x > c → tension
+       */
+
+      const strain = epsCu * (1 - bar.x / c);
+
+      /*
+       * Elastic-perfectly-plastic steel
+       */
+
+      let stress = Es * strain;
+      stress = Math.max(-fy, Math.min(fy, stress));
+
+      /*
+       * Steel force
+       *
+       * Compression = positive
+       * Tension = negative
+       */
+
+      const force = bar.As * stress;
+      steelAxial += force;
+      steelMomentAboutEdge += force * bar.x;
+
+      steelResults.push({
+        ...bar,
+        strain,
+        stress,
+        force,
+        forcekN: force / 1000
+      });
+    });
+
+    /*
+     * Nominal axial capacity
+     */
+
+    const Pn = Cc + steelAxial;
+
+    /*
+     * Moment about compression edge
+     */
+
+    const momentAboutEdge = Cc * xCc + steelMomentAboutEdge;
+
+    /*
+     * Convert to moment about section centroid
+     *
+     * M = ΣF × (x - L/2)
+     */
+
+    const centroid = L / 2;
+    const Mn = Math.abs(momentAboutEdge - Pn * centroid);
+
+    /*
+     * Split steel forces
+     */
+
+    const compressionSteel = steelResults.filter(item => item.force > 0).reduce((sum, item) => sum + item.force, 0);
+    const tensionSteel = steelResults.filter(item => item.force < 0).reduce((sum, item) => sum + Math.abs(item.force), 0);
+
+    return {
+      c,
+      a,
+      Cc,
+      steelAxial,
+      Pn,
+      Mn,
+      steelResults,
+      compressionSteel,
+      tensionSteel
+    };
+  }
+
+  /* ========================================================================
+     NEUTRAL AXIS SOLVER
+     Solve:
+
+     Pn(c) = N*
+
+     using bisection.
+
+     Ntarget:
+     kN → N
+  ========================================================================= */
+
+  const Ntarget = Nstar * 1000;
+  let cLow = Math.max(0.1, L * 0.0001);
+  let cHigh = Math.max(L * 20, 1000);
+  let sectionResult = null;
+
+  /*
+   * Check end values
+   */
+
+  let lowResult = evaluateSection(cLow);
+  let highResult = evaluateSection(cHigh);
+
+  /*
+   * Expand search range if necessary
+   */
+
+  let expandCount = 0;
+  while ((lowResult.Pn - Ntarget) * (highResult.Pn - Ntarget) > 0 && expandCount < 20) {
+    cHigh *= 2;
+    highResult = evaluateSection(cHigh);
+    expandCount++;
+  }
+
+  /*
+   * Bisection
+   */
+
+  for (let i = 0; i < 120; i++) {
+    const cMid = (cLow + cHigh) / 2;
+    const result = evaluateSection(cMid);
+    const error = result.Pn - Ntarget;
+    sectionResult = result;
+
+    /*
+     * Convergence tolerance
+     */
+
+    if (Math.abs(error) < Math.max(10, Math.abs(Ntarget) * 1e-6)) {
+      break;
+    }
+
+    /*
+     * Bisection direction
+     */
+
+    const lowError = lowResult.Pn - Ntarget;
+    if (lowError * error <= 0) {
+      cHigh = cMid;
+      highResult = result;
+    } else {
+      cLow = cMid;
+      lowResult = result;
+    }
+  }
+
+  /*
+   * Fallback
+   */
+
+  if (!sectionResult) { sectionResult = evaluateSection(L / 2);}
+
+  /* ========================================================================
+     SECTION CAPACITY RESULTS
+  ========================================================================= */
+
+  const neutralAxis = sectionResult.c;
+  const compressionBlockDepth = sectionResult.a;
+  const concreteCompression = sectionResult.Cc;
+  const nominalAxial = sectionResult.Pn / 1000; // kN
+  const nominalMoment = sectionResult.Mn / 1e6; // kN.m
+  const phiMn = phiFlexure * nominalMoment;
+  const momentRatio = phiMn > 0 ? Mstar / phiMn : Infinity;
+
+  /*
+   * Axial capacity reference
+   *
+   * Pure compression reference only
+   */
+
+  const P0 = alpha1 * fc * Ag + AsTotal * fy;
+  const phiPn = phiFlexure * P0 / 1000;
+  const axialRatio = phiPn > 0 ? Nstar / phiPn : 0;
+
+  /*
+   * Main interaction utilisation
+   *
+   * Capacity is solved at actual N*
+   */
+  const interactionRatio = momentRatio;
+
+  /* ========================================================================
+     LOW AXIAL LOAD RATIO
+  ========================================================================= */
+
+  const grossConcreteCapacity = fc * Ag; // N
+  const lowAxialRatio = grossConcreteCapacity > 0 ? Ntarget / grossConcreteCapacity : 0;
+
+  /* ========================================================================
+     STEEL SUMMARY
+  ========================================================================= */
+
+  const steelResults = sectionResult.steelResults || [];
+  const compressionSteelForce = sectionResult.compressionSteel || 0;
+  const tensionSteelForce = sectionResult.tensionSteel || 0;
+  const yieldedBars = steelResults.filter(item => Math.abs(item.stress) >= fy * 0.999).length;
+  const compressionBars = steelResults.filter(item => item.force > 0).length;
+  const tensionBars = steelResults.filter(item => item.force < 0).length;
+
+  /* ========================================================================
+     RENDER
+  ========================================================================= */
 
   return (
-    <CalculationSection number="5" title="In-Plane Section Checks · 平面内截面验算" chip={<Chip size="small" label="NZS 3101 (simplified)" />}>
-      <CalculationSubsection title="5.1 Elastic stress distribution · 弹性应力分布">
-        <CalculationFormula caption="Uniform axial stress / 均匀轴压应力"
-          formula={`\\sigma_N = \\frac{N^*}{A_g} = \\frac{${tx(gravity.Ngravity)}\\times1000}{${tx(geo.Ag, 0)}} = ${tx(es.sigmaN, 4)}\\,\\mathrm{MPa}`} />
-        <CalculationFormula caption="Bending stress / 弯曲应力"
-          formula={`\\sigma_M = \\frac{M^*}{Z_g} = \\frac{${tx(sectionactions.Mtotal)}\\times10^6}{${tx(geo.Zg, 0)}} = ${tx(es.sigmaM, 4)}\\,\\mathrm{MPa}`} />
-        <CalculationFormula caption="Maximum edge compression / 最大边缘压应力" highlight
-          formula={`\\sigma_{max} = \\sigma_N+\\sigma_M = ${tx(es.sigmaMax, 4)}\\,\\mathrm{MPa}`}
-          status={mkStatus(ch.stressCompressionPass, 'PASS', 'CHECK')} />
-        <CalculationFormula caption="Minimum edge stress / 最小边缘应力"
-          formula={`\\sigma_{min} = \\sigma_N-\\sigma_M = ${tx(es.sigmaMin, 4)}\\,\\mathrm{MPa}`}
-          status={mkStatus(safe(es.sigmaMin) >= 0, 'NO TENSION', 'TENSION PREDICTED')} />
-        <CalculationFormula caption="Resultant eccentricity / 合力偏心距"
-          formula={`e = \\frac{M^*}{N^*} = \\frac{${tx(sectionactions.Mtotal)}}{${tx(gravity.Ngravity)}} = ${tx(es.eccentricity, 4)}\\,\\mathrm{m} = ${tx(safe(es.eccentricity) * 1000, 1)}\\,\\mathrm{mm},\\qquad   \\frac{l_w}{2} = \\frac{${tx(geo.bwall)}}{2} = ${tx(es.kern, 1)}\\,\\mathrm{m}\\qquad ${es.compareEcc}`} />
-        <CalculationFormula caption="Lever arm / 力臂Z"
-          formula={`Z = \\frac{2}{3} l_w = \\frac{2}{3}\\times ${tx(geo.bwall)} = ${tx(es.leverArm, 1)}\\,\\mathrm{m}`} />
-        <CalculationFormula caption="Resultant force at compression ends / 受压端部受力" highlight
-          formula={`N_{comp} = N^* / 2 + M^* / Z = ${tx(gravity.Ngravity)} / 2 + ${tx(sectionactions.Mtotal)} / ${tx(es.leverArm, 1)} = ${tx(es.Ncompression, 2)}\\,\\mathrm{kN}`} />
-        <CalculationFormula caption="Resultant force at tension ends / 受拉端部受力"
-          formula={`N_{tension} = N^* / 2 - M^* / Z = ${tx(gravity.Ngravity)} / 2 - ${tx(sectionactions.Mtotal)} / ${tx(es.leverArm, 1)} = ${tx(es.Ntension, 2)}\\,\\mathrm{kN}`}
-          status={mkStatus(safe(es.Ntension) > 0, 'COMPRESSION', 'TENSION / UPLIFT')} />
+    <CalculationSection number="5" title="In-Plane Section Checks · 平面内截面验算"
+      chip={<Chip size="small" label="NZS 3101 + Strain Compatibility"/>} >
+
+      {/* ================================================================ */}
+      {/* 5.1 ELASTIC STRESS */}
+      {/* ================================================================ */}
+
+      <CalculationSubsection title="5.1 First-order elastic stress distribution · 一阶弹性应力分布" >
+        <CalculationFormula
+          caption="Uniform axial stress / 均匀轴压应力"
+          formula={`\\sigma_N = \\frac{N^*}{A_g} =\\frac{${tx(Nstar)}\\times1000}{${tx(Ag, 0)}} =${tx(sigmaN, 4)} \\,\\mathrm{MPa}`} />
+        <CalculationFormula
+          caption="Elastic bending stress / 弹性弯曲应力"
+          formula={`\\sigma_M = \\frac{M^*}{Z_g} = \\frac{${tx(Mstar)}\\times10^6}{${tx(Zg, 0)}} = ${tx(sigmaM, 4)} \\,\\mathrm{MPa}`} />
+        <CalculationFormula
+          caption="Maximum edge compression / 最大边缘压应力"
+          formula={`\\sigma_{max} = \\sigma_N+\\sigma_M = ${tx(sigmaMax, 4)} \\,\\mathrm{MPa}`}
+          highlight
+          status={mkStatus(ch.stressCompressionPass !== false, 'PASS', 'CHECK')} />
+        <CalculationFormula
+          caption="Minimum edge stress / 最小边缘应力"
+          formula={`\\sigma_{min} = \\sigma_N-\\sigma_M = ${tx(sigmaMin, 4)} \\,\\mathrm{MPa}`}
+          status={mkStatus(sigmaMin >= 0, 'NO TENSION', 'TENSION / CRACKING')} />
       </CalculationSubsection>
 
-      <CalculationSubsection title="5.2 Simplified N-M interaction · N-M 交互（简化模型）">
-        <CalculationFormula caption="Effective depth / 有效高度"
-          formula={`d = t\\times1000 - c_{cover} - \\frac{\\phi_b}{2} = ${tx(inputs.wallThickness)}\\times1000 - ${tx(inputs.cover)} - \\frac{${tx(inputs.boundaryBarDiameter,0)}}{2} = ${tx(re.d, 1)}\\,\\mathrm{mm}`} />
-        <CalculationFormula caption="Concrete compression force / 混凝土压力"
-          formula={`C_c = 0.85\\,f'_c\\,b_c\\,a_{block} = 0.85(${tx(inputs.fc)})(${tx(safe(inputs.boundaryWidth) * 1000, 0)})(${tx(minBlock, 0)}) = ${tx(it.compressionConcrete, 0)}\\,\\mathrm{N}`} />
-        <CalculationFormula caption="Steel compression force / 钢筋压力"
-          formula={`C_s = A_{s,b}f_y = ${tx(it.steelCompression, 0)}\\,\\mathrm{N}`} />
-        <CalculationFormula caption="Design axial capacity / 轴压承载力" highlight
-          formula={`\\phi P_n = \\phi_c(C_c+C_s)/1000 = \\frac{${tx(inputs.phiCompression)}\\times(${tx(it.compressionConcrete, 0)}+${tx(it.steelCompression, 0)})}{1000} = ${tx(it.phiPn)}\\,\\mathrm{kN}`} />
-        <CalculationFormula caption="Approximate flexural capacity / 近似抗弯承载力" highlight
-          formula={`\\phi M_n = \\phi_f\\frac{(C_c+C_s)(d/2)}{10^6} = \\frac{${tx(inputs.phiFlexure)}\\times(${tx(it.compressionConcrete, 0)}+${tx(it.steelCompression, 0)})\\times(${tx(re.d, 1)}/2)}{10^6} = ${tx(it.phiMn)}\\,\\mathrm{kN\\cdot m}`} />
-        <CalculationFormula caption="N-M interaction ratio / N-M 交互利用率" highlight
-          formula={`\\eta_{N-M} = \\frac{N^*}{\\phi P_n} + \\frac{M^*}{\\phi M_n} = \\frac{${tx(sectionactions.NseismicCompression)}}{${tx(it.phiPn)}} + \\frac{${tx(sectionactions.Mtotal)}}{${tx(it.phiMn)}} = ${tx(it.axialRatio, 4)} + ${tx(it.momentRatio, 4)} = ${txUR(it.interactionRatio)}`}
-          status={mkStatus(ch.interactionPass, 'PASS', 'CHECK')} />
+
+      {/* ================================================================ */}
+      {/* 5.2 ECCENTRICITY */}
+      {/* ================================================================ */}
+
+      <CalculationSubsection title="5.2 Resultant eccentricity & cracking classification · 偏心距与开裂判断" >
+        <CalculationFormula
+          caption="Resultant eccentricity / 合力偏心距"
+          formula={`e = \\frac{M^*}{N^*} = \\frac{${tx(Mstar)}}{${tx(Nstar)}} = ${tx(eccentricity, 4)} \\,\\mathrm{m} = ${tx(eccentricity * 1000, 1)} \\,\\mathrm{mm}`}
+          highlight />
+        <CalculationFormula
+          caption="Middle-third kern limit / 矩形截面核心区"
+          formula={`e_k = \\frac{l_w}{6} = \\frac{${tx(lw)}}{6} = ${tx(kernLimit, 4)} \\,\\mathrm{m}`} />
+        <CalculationFormula
+          caption="Section stress condition / 截面应力状态"
+          formula={`\\begin{cases} e\\leq l_w/6 & \\Rightarrow \\text{Entire section in compression} \\\\ e>l_w/6 & \\Rightarrow \\text{Tensile stress and cracking} \\end{cases}`} />
+        <CalculationFormula
+          caption="Cracking classification / 开裂状态"
+          formula={`${tx(eccentricity, 4)} \\; ${eccentricity <= kernLimit ? '\\leq' : '>'} \\; ${tx(kernLimit, 4)} \\quad\\Rightarrow\\quad \\text{${cracked ? 'CRACKED SECTION — STRAIN COMPATIBILITY REQUIRED' : 'UNCRACKED SECTION'}}`}
+          highlight
+          status={mkStatus(!cracked, 'UNCRACKED', 'CRACKED SECTION')} />
       </CalculationSubsection>
 
-      <CalculationSubsection title="5.3 In-plane shear · 平面内抗剪">
-        <CalculationFormula caption="Web width & shear depth / 腹板宽度与有效剪深"
-          formula={`b_w = ${tx(sh.bw, 0)}\\,\\mathrm{mm},\\qquad d_v = 0.8d = ${tx(sh.dv, 0)}\\,\\mathrm{mm}`} />
-        <CalculationFormula caption="Concrete shear capacity / 混凝土抗剪"
-          formula={`V_c = 0.17\\sqrt{f'_c}\\,b_w\\,d_v/1000 = ${tx(sh.vc)}\\,\\mathrm{kN},\\qquad \\phi V_c = ${tx(sh.phiVc)}\\,\\mathrm{kN}`} />
-        <CalculationFormula caption="Horizontal steel contribution / 水平筋抗剪"
-          formula={`V_s = \\frac{2A_{\\phi h}f_y d_v}{s_h} = ${tx(sh.VsProvided)}\\,\\mathrm{kN}`} />
-        <CalculationFormula caption="Design shear capacity / 抗剪承载力" highlight
-          formula={`\\phi V = \\phi V_c + \\phi V_s = ${tx(sh.shearCapacity)}\\,\\mathrm{kN}`} />
-        <CalculationFormula caption="Shear utilisation / 抗剪利用率" highlight
-          formula={`UR_V = \\frac{V^*}{\\phi V} = \\frac{${tx(sectionactions.Vtotal)}}{${tx(sh.shearCapacity)}} = ${txUR(sh.shearRatio)} = ${txPct(sh.shearRatio)}\\%`}
+      {/* ================================================================ */}
+      {/* 5.3 REINFORCEMENT */}
+      {/* ================================================================ */}
+
+      <CalculationSubsection title="5.3 Vertical reinforcement model · 竖向钢筋截面模型" >
+        <CalculationFormula
+          caption="Distributed reinforcement bar area / 分布钢筋单根面积"
+          formula={`A_{s,v} = \\frac{\\pi\\phi_v^2}{4} = \\frac{\\pi(${tx(VbarDia)})^2}{4} = ${tx(AsDistributedBar, 1)} \\,\\mathrm{mm^2}`} />
+        <CalculationFormula
+          caption="Boundary reinforcement bar area / 边缘钢筋单根面积"
+          formula={`A_{s,b} = \\frac{\\pi\\phi_b^2}{4} = \\frac{\\pi(${tx(boundaryBarDia)})^2}{4} = ${tx(AsBoundaryBar, 1)} \\,\\mathrm{mm^2}`} />
+        <CalculationFormula
+          caption="Total vertical reinforcement used in section / 截面参与计算的竖向钢筋"
+          formula={`n_{bars} = ${bars.length}, \\qquad A_{s,total} = ${tx(AsTotal, 1)} \\,\\mathrm{mm^2}`}
+          highlight />
+      </CalculationSubsection>
+
+      {/* ================================================================ */}
+      {/* 5.4 STRAIN COMPATIBILITY */}
+      {/* ================================================================ */}
+
+      <CalculationSubsection title="5.4 NZS 3101 strain compatibility · 应变协调与中性轴求解" >
+        <CalculationFormula
+          caption="Ultimate concrete strain / 极限混凝土压应变"
+          formula={`\\varepsilon_{cu} = ${tx(epsCu, 4)}`} />
+        <CalculationFormula
+          caption="Plane section strain distribution / 平截面应变分布"
+          formula={`\\varepsilon_s(x) = \\varepsilon_{cu} \\left(1-\\frac{x}{c}\\right)`} />
+        <CalculationFormula
+          caption="Steel stress from strain compatibility / 钢筋应力"
+          formula={`f_s = \\max \\left( -f_y, \\min (E_s\\varepsilon_s,f_y) \\right)`} />
+        <CalculationFormula
+          caption="Equivalent compression block / 等效矩形压应力块"
+          formula={`a = \\beta_1c = ${tx(beta1, 3)} \\times ${tx(neutralAxis, 1)} = ${tx(compressionBlockDepth, 1)} \\,\\mathrm{mm}`} />
+        <CalculationFormula
+          caption="Concrete compression resultant / 混凝土压缩合力"
+          formula={`C_c = \\alpha_1f'_cba = ${tx(alpha1, 3)} \\times ${tx(fc)} \\times ${tx(t, 0)} \\times ${tx(compressionBlockDepth, 1)} = ${tx(concreteCompression / 1000, 2)} \\,\\mathrm{kN}`} />
+        <CalculationFormula
+          caption="Axial force equilibrium / 轴力平衡"
+          formula={`P_n(c) = C_c + \\sum F_s = N^*`} />
+        <CalculationFormula
+          caption="Solved neutral axis depth / 迭代求得中性轴深度"
+          formula={`c = ${tx(neutralAxis, 1)} \\,\\mathrm{mm}`}
+          highlight />
+        <CalculationFormula
+          caption="Steel force state / 钢筋受力状态"
+          formula={`n_c = ${compressionBars}, \\qquad n_t = ${tensionBars}, \\qquad n_y = ${yieldedBars}`} />
+        <CalculationFormula
+          caption="Compression and tension steel resultants / 钢筋合力"
+          formula={`C_s = ${tx(compressionSteelForce / 1000, 2)} \\,\\mathrm{kN}, \\qquad T_s = ${tx(tensionSteelForce / 1000, 2)} \\,\\mathrm{kN}`} />
+      </CalculationSubsection>
+
+      {/* ================================================================ */}
+      {/* 5.5 MOMENT CAPACITY */}
+      {/* ================================================================ */}
+
+      <CalculationSubsection title="5.5 Section N-M capacity at applied axial load · 给定轴力下截面抗弯承载力" >
+        <CalculationFormula
+          caption="Nominal axial force equilibrium / 名义轴力"
+          formula={`P_n = C_c + \\sum F_s = ${tx(nominalAxial, 2)} \\,\\mathrm{kN} \\approx N^* = ${tx(Nstar, 2)} \\,\\mathrm{kN}`} />
+        <CalculationFormula
+          caption="Nominal moment about section centroid / 截面名义弯矩"
+          formula={`M_n = \\left| \\sum F_ix_i - P_n\\frac{l_w}{2} \\right| = ${tx(nominalMoment, 2)} \\,\\mathrm{kN\\cdot m}`} />
+        <CalculationFormula
+          caption="Design moment capacity / 设计抗弯承载力"
+          formula={`\\phi M_n(N^*) = \\phi M_n = ${tx(phiFlexure, 3)} \\times ${tx(nominalMoment, 2)} = ${tx(phiMn, 2)} \\,\\mathrm{kN\\cdot m}`}
+          highlight />
+        <CalculationFormula
+          caption="Moment utilisation at applied axial load / 给定轴力下抗弯利用率"
+          formula={`UR_M = \\frac{M^*}{\\phi M_n(N^*)} = \\frac{${tx(Mstar, 2)}}{${tx(phiMn, 2)}} = ${txUR(momentRatio)} = ${txPct(momentRatio)} \\%`}
+          highlight
+          status={mkStatus(momentRatio <= 1, 'PASS', 'CHECK')} />
+      </CalculationSubsection>
+
+      {/* ================================================================ */}
+      {/* 5.6 AXIAL LOAD LEVEL */}
+      {/* ================================================================ */}
+
+      <CalculationSubsection title="5.6 Axial load level · 轴压水平与低轴力特征" >
+        <CalculationFormula
+          caption="Gross-section axial load ratio / 毛截面轴压比"
+          formula={`\\eta_N = \\frac{N^*}{f'_cA_g} = \\frac{${tx(Nstar)}\\times1000}{${tx(fc)} \\times ${tx(Ag, 0)}} = ${tx(lowAxialRatio, 5)}`}
+          highlight />
+        <CalculationFormula
+          caption="Design interpretation / 设计解释"
+          formula={`\\eta_N = ${tx(lowAxialRatio, 5)} \\quad\\Rightarrow\\quad \\text{${lowAxialRatio <= 0.01 ? 'LOW AXIAL LOAD — FLEXURE DOMINATED PANEL' : 'HIGHER AXIAL LOAD — N-M EFFECT SIGNIFICANT'}}`}
+          status={mkStatus(lowAxialRatio <= 0.01, 'LOW AXIAL LOAD', 'REVIEW AXIAL LOAD')} />
+        <CalculationFormula
+          caption="Reference pure compression capacity / 参考纯压承载力"
+          formula={`\\phi P_0 = \\phi (\\alpha_1f'_cA_g + A_sf_y) = ${tx(phiPn, 2)} \\,\\mathrm{kN}`} />
+        <CalculationFormula
+          caption="Reference axial utilisation / 参考轴压利用率"
+          formula={`UR_N = \\frac{N^*}{\\phi P_0} = ${tx(axialRatio, 4)} = ${txPct(axialRatio)} \\%`} />
+      </CalculationSubsection>
+
+      {/* ================================================================ */}
+      {/* 5.7 IN-PLANE SHEAR */}
+      {/* ================================================================ */}
+
+      <CalculationSubsection title="5.7 In-plane shear · 平面内抗剪" >
+        <CalculationFormula
+          caption="Web width & shear depth / 腹板宽度与有效剪深"
+          formula={`b_w = ${tx(sh.bw, 0)} \\,\\mathrm{mm}, \\qquad d_v = ${tx(sh.dv, 0)} \\,\\mathrm{mm}`} />
+        <CalculationFormula
+          caption="Concrete shear capacity / 混凝土抗剪"
+          formula={`V_c = ${tx(sh.vc)} \\,\\mathrm{kN}, \\qquad \\phi V_c = ${tx(sh.phiVc)} \\,\\mathrm{kN}`} />
+        <CalculationFormula
+          caption="Horizontal reinforcement contribution / 水平钢筋抗剪贡献"
+          formula={`V_s = ${tx(sh.VsProvided)} \\,\\mathrm{kN}`} />
+        <CalculationFormula
+          caption="Design shear capacity / 设计抗剪承载力"
+          formula={`\\phi V_n = ${tx(sh.shearCapacity)} \\,\\mathrm{kN}`}
+          highlight />
+        <CalculationFormula
+          caption="Shear utilisation / 抗剪利用率"
+          formula={`UR_V = \\frac{V^*}{\\phi V_n} = \\frac{${tx(Vstar)}}{${tx(sh.shearCapacity)}} = ${txUR(sh.shearRatio)} = ${txPct(sh.shearRatio)} \\%`}
+          highlight
           status={mkStatus(ch.shearPass, 'PASS', 'CHECK')} />
       </CalculationSubsection>
-
-
     </CalculationSection>
   );
 }
+
 
 /* ---------------------------------------------------------------------------
 6. OUT-OF-PLANE DESIGN (WIND & SEISMIC) 
@@ -924,13 +1460,275 @@ return (
 }
 
 /* ---------------------------------------------------------------------------
-   8. Wall Stability Check（连接计算）
+8. Wall Stability Check（墙体稳定计算）
 --------------------------------------------------------------------------- */
-function StabilityBlock({ inputs, inPlane, outOfPlane }) {
-  const geo = inPlane.geometry || {};
-  return (
-    <CalculationSection number="8" title="Wall Stability Check · 稳定计算" chip={<Chip size="small" label="Wall Stability / Buckle " />}>
+function StabilityBlock({ inputs, inPlane }) {
+  const gravity = inPlane.gravity || {};
+  const seismic = inPlane.seismic || {};
+  const diaphragm = inPlane.diaphragm || {};
+  const re = inPlane.reinforcement || {};
 
+  /*
+  BRANZ Guide – Slender precast concrete panels with low axial load
+  8.4 Wall panel design for stability
+
+  Four stability checks are required:
+    1) H/t ≤ 75
+    2) kH/t ≤ 65
+    3) stability under axial load – “Euler buckling” method
+    4) stability under lateral torsional buckling (Vlasov/Timoshenko)
+
+  The BRANZ Guide does not use the previous 0.1 f'c Ag axial-load limit,
+  generic P-Delta limit, or N-M interaction as the Section 8.4 stability
+  criteria. They are therefore not used here.
+  */
+
+  const H = safe(inputs.wallHeight);
+  const L = safe(inputs.wallWidth);
+  const t = safe(inputs.wallThickness);
+  const fc = safe(inputs.fc);
+  const fy = safe(inputs.fy);
+
+  /*
+  The k factor is selected from BRANZ Guide Table 5.
+  Pinned–Pinned = 1.0
+  Fixed–Pinned  = 1.0 (conservative value within the Guide range)
+  Fixed–Free   = 1.4 (top restraint = Nil)
+
+  Fixed–Fixed is not explicitly listed in Table 5. It is conservatively
+  treated as k = 1.0 rather than assuming a smaller effective height.
+  */
+  const support = inputs.supportWindSeismic || 'Pinned-Pinned';
+  const kBySupport = {
+    'Pinned-Pinned': 1.0,
+    'Fixed-Pinned': 1.0,
+    'Fixed-Free': 1.4,
+    'Fixed-Fixed': 1.0
+  };
+  const k = kBySupport[support] ?? 1.0;
+
+  /*
+  Wall geometry used directly by Section 8.4.
+  H/t ≤ 75 is based on the actual wall height, not hroof.
+  */
+  const H_over_t = t > 0 ? H / t : Infinity;
+  const kH_over_t = t > 0 ? k * H / t : Infinity;
+  const HtLimit = 75;
+  const kHtLimit = 65;
+  const HtPass = Number.isFinite(H_over_t) && H_over_t <= HtLimit + 1e-9;
+  const kHtPass = Number.isFinite(kH_over_t) && kH_over_t <= kHtLimit + 1e-9;
+
+  /*
+  Gross cross-sectional area of the whole panel.
+  P, W and Ag must be on a consistent whole-panel basis in Equations 1 and 2.
+  */
+  const Ag = L > 0 && t > 0 ? L * 1000 * t * 1000 : 0; // mm²
+
+  /*
+  BRANZ P = gravity load from the roof on the wall.
+  The current calculation engine provides this as GlineTotal (kN).
+  W = self-weight of the wall panel (kN).
+  */
+  const P = safe(gravity.GlineTotal,
+    safe(inputs.gUniform) * safe(inputs.Sr, 1) * L);
+  const W = safe(gravity.Gwall,
+    safe(inputs.concreteDensity) * t * H * L);
+
+  /*
+  Vertical reinforcement ratio ρt used by the BRANZ stability equations.
+  */
+  const rhoT = Number.isFinite(Number(re.rhoVertical))
+    ? Math.max(Number(re.rhoVertical), 0)
+    : (() => {
+        const sv = safe(inputs.VbarSpace);
+        const dv = safe(inputs.VbarDia);
+        const nV = sv > 0 && L > 0 ? Math.floor((L * 1000) / sv) + 1 : 0;
+        const AsV = nV * Math.PI * dv ** 2 / 4;
+        return Ag > 0 ? AsV / Ag : 0;
+      })();
+
+  /*
+  Equation 1 — Euler buckling stability.
+
+    kH/t ≤ 15 / [ (P + 0.5W)/(f'c Ag) + 0.4ρt fy/f'c ]
+
+  The dimensionless load term is also the ordinate used in Figure 12.
+  */
+  const axialLoadTerm = fc > 0 && Ag > 0
+    ? (P + 0.5 * W) * 1000 / (fc * Ag)
+    : Infinity;
+  const steelEulerTerm = fc > 0
+    ? 0.4 * rhoT * fy / fc
+    : Infinity;
+  const eulerLoadTerm = axialLoadTerm + steelEulerTerm;
+  const eulerLimit = Number.isFinite(eulerLoadTerm) && eulerLoadTerm > 0
+    ? 15 / eulerLoadTerm
+    : Infinity;
+  const eulerPass = Number.isFinite(kH_over_t) && kH_over_t <= eulerLimit + 1e-9;
+
+  /*
+  Me* is the design base moment corresponding to μ = 1.0.
+  The existing in-plane seismic result is based on the selected design
+  ductility. Scale the seismic moment back to the elastic (μ = 1) action
+  using Cd(μ=1) / Cd(current). Roof diaphragm seismic moment is included
+  because it is an in-plane seismic action at the wall top.
+  */
+  const CdCurrent = safe(seismic.Cd);
+  const CdElastic = safe(seismic.CT1);
+  const elasticScale = CdCurrent > 0 && CdElastic > 0
+    ? CdElastic / CdCurrent
+    : 1;
+  const MseismicCurrent = safe(seismic.Mseismic);
+  const MdiaphragmSeismicCurrent = safe(diaphragm.MdiaphragmSeismic);
+  const MeStar = Math.abs(
+    (MseismicCurrent + MdiaphragmSeismicCurrent) * elasticScale
+  );
+
+  /*
+  Equation 2 — Vlasov/Timoshenko lateral torsional buckling.
+
+    (kH/t)(H/L)^0.5 ≤ 12 / λ
+
+  Check both BRANZ cases:
+    (a) λ = ρt fy/f'c + (P + 0.5W)/(f'c Ag)
+    (b) λ = 2.2 Me* /(L f'c Ag)
+
+  The Guide states that both case points must be on the acceptable side.
+  */
+  const ltbGeometry = L > 0 && H > 0 && Number.isFinite(kH_over_t)
+    ? kH_over_t * Math.sqrt(H / L)
+    : Infinity;
+
+  const ltbLoadA = fc > 0 && Ag > 0
+    ? rhoT * fy / fc + (P + 0.5 * W) * 1000 / (fc * Ag)
+    : Infinity;
+  const ltbLoadB = fc > 0 && Ag > 0 && L > 0
+    ? 2.2 * MeStar * 1e6 / (L * fc * Ag)
+    : Infinity;
+
+  const ltbProductA = ltbGeometry * ltbLoadA;
+  const ltbProductB = ltbGeometry * ltbLoadB;
+  const ltbPassA = Number.isFinite(ltbProductA) && ltbProductA <= 12 + 1e-9;
+  const ltbPassB = Number.isFinite(ltbProductB) && ltbProductB <= 12 + 1e-9;
+  const ltbPass = ltbPassA && ltbPassB;
+
+  const overallOK = HtPass && kHtPass && eulerPass && ltbPass;
+
+  const stabilityRows = [
+    [
+      '8.4.1 H/t ≤ 75',
+      `H/t = ${tx(H_over_t)} ≤ ${tx(HtLimit, 0)}`,
+      HtPass
+    ],
+    [
+      '8.4.2 kH/t ≤ 65',
+      `k = ${tx(k, 2)}, kH/t = ${tx(kH_over_t)} ≤ ${tx(kHtLimit, 0)}`,
+      kHtPass
+    ],
+    [
+      '8.4.3 Euler buckling stability',
+      `kH/t = ${tx(kH_over_t)} ≤ ${tx(eulerLimit, 2)}`,
+      eulerPass
+    ],
+    [
+      '8.4.4 Lateral torsional buckling',
+      `Case (a): ${tx(ltbProductA, 3)} ≤ 12; Case (b): ${tx(ltbProductB, 3)} ≤ 12`,
+      ltbPass
+    ]
+  ];
+
+  return (
+    <CalculationSection number="8" title="Wall Stability Check · 稳定计算" chip={<Chip size="small" label="BRANZ Guide §8.4" />}
+    >
+      <Alert severity={overallOK ? 'success' : 'warning'} sx={{ mb: 2 }}>
+        BRANZ §8.4 wall panel stability checks: H/t limit, effective-height
+        slenderness kH/t, Euler buckling stability and Vlasov/Timoshenko lateral
+        torsional buckling. （BRANZ §8.4 墙板稳定验算：H/t 限值、有效高度长细比
+        kH/t、Euler 屈曲稳定以及 Vlasov/Timoshenko 侧向扭转屈曲。）
+      </Alert>
+
+      <Box sx={{ overflowX: 'auto', mb: 2 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <thead>
+            <tr>
+              {['Stability check', 'Result', 'Status'].map((hd) => (
+                <th key={hd} style={{textAlign: hd === 'Stability check' ? 'left' : 'right',
+                    padding: '6px 10px', borderBottom: '2px solid #e5e7eb', fontWeight: 800}}>
+                  {hd}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {stabilityRows.map(([label, value, pass]) => (
+              <tr key={label}>
+                <td style={{padding: '6px 10px', borderBottom: '1px solid #eee', fontWeight: 600}}>
+                  {label}
+                </td>
+                <td style={{textAlign: 'right', padding: '6px 10px', borderBottom: '1px solid #eee', fontVariantNumeric: 'tabular-nums'}}>
+                  {value}
+                </td>
+                <td style={{ textAlign: 'right', padding: '6px 10px', borderBottom: '1px solid #eee'}}>
+                  <Chip size="small" label={pass ? 'PASS' : 'CHECK'} color={pass ? 'success' : 'warning'} sx={{ fontWeight: 700 }} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Box>
+
+      <CalculationSubsection title="8.4.1 H/t limit · 高厚比限值">
+        <CalculationFormula caption="Wall height / 墙高"
+          formula={`H = ${tx(H)}\\,\\mathrm{m},\\qquad t = ${tx(t)}\\,\\mathrm{m}`}
+        />
+        <CalculationFormula caption="H/t ≤ 75"
+          formula={`\\frac{H}{t} = \\frac{${tx(H)}}{${tx(t)}} = ${tx(H_over_t)} \\le 75`}
+          status={mkStatus(HtPass, 'PASS', 'CHECK')}
+        />
+      </CalculationSubsection>
+
+      <CalculationSubsection title="8.4.2 Effective height coefficient k · 有效高度系数 k">
+        <CalculationFormula caption="Support condition / 支承条件"
+          formula={`\\text{Support} = ${support},\\qquad k = ${tx(k, 2)}`}
+        />
+        <CalculationFormula caption="Effective slenderness kH/t / 有效长细比"
+          formula={`\\frac{kH}{t} = ${tx(k, 2)}\\times\\frac{${tx(H)}}{${tx(t)}} = ${tx(kH_over_t)} \\le 65`}
+          status={mkStatus(kHtPass, 'PASS', 'CHECK')}/>
+      </CalculationSubsection>
+
+      <CalculationSubsection title="8.4.3 Euler buckling stability · Euler 屈曲稳定">
+        <CalculationFormula caption="Gross wall area / 墙体毛截面面积"
+          formula={`A_g = (${tx(L)}\\times1000)(${tx(t)}\\times1000) = ${tx(Ag, 0)}\\,\\mathrm{mm^2}`} />
+        <CalculationFormula caption="Roof gravity load P / 屋面重力荷载 P"
+          formula={`P = ${tx(P)}\\,\\mathrm{kN}`}
+        />
+        <CalculationFormula caption="Wall self-weight W / 墙体自重 W"
+          formula={`W = ${tx(W)}\\,\\mathrm{kN}`}        />
+        <CalculationFormula caption="Euler load parameter / Euler 荷载参数"
+          formula={`\\Lambda_E = \\frac{P+0.5W}{f'_cA_g} + 0.4\\rho_t\\frac{f_y}{f'_c} = ${tx(eulerLoadTerm, 4)}`} />
+        <CalculationFormula caption="Euler stability inequality / Euler 稳定不等式"
+          formula={`\\frac{kH}{t} \\le \\frac{15}{\\Lambda_E} = \\frac{15}{${tx(eulerLoadTerm, 4)}} = ${tx(eulerLimit, 2)}`}
+          status={mkStatus(eulerPass, 'PASS', 'CHECK')} />
+      </CalculationSubsection>
+
+      <CalculationSubsection title="8.4.4 Lateral torsional buckling · 侧向扭转屈曲">
+        <CalculationFormula caption="Geometry term / 几何项"
+          formula={`X = \\frac{kH}{t}\\left(\\frac{H}{L}\\right)^{1/2} = ${tx(kH_over_t)}\\left(\\frac{${tx(H)}}{${tx(L)}}\\right)^{1/2} = ${tx(ltbGeometry, 3)}`} />
+        <CalculationFormula
+          caption="Case (a) load parameter / 情况 (a) 荷载参数"
+          formula={`\\lambda_a = \\rho_t\\frac{f_y}{f'_c}+\\frac{P+0.5W}{f'_cA_g} = ${tx(ltbLoadA, 4)},\\qquad X\\lambda_a = ${tx(ltbProductA, 3)} \\le 12`}
+          status={mkStatus(ltbPassA, 'PASS', 'CHECK')} />
+        <CalculationFormula caption="Case (b) elastic moment parameter / 情况 (b) 弹性弯矩参数"
+          formula={`M_e^* = ${tx(MeStar)}\\,\\mathrm{kN\\cdot m},\\qquad \\lambda_b = \\frac{2.2M_e^*}{Lf'_cA_g} = ${tx(ltbLoadB, 4)},\\qquad X\\lambda_b = ${tx(ltbProductB, 3)} \\le 12`}
+          status={mkStatus(ltbPassB, 'PASS', 'CHECK')} />
+        <CalculationFormula caption="Overall lateral torsional stability / 总体侧向扭转稳定"
+          highlight
+          formula={`\\text{Case (a)}\\;X\\lambda_a = ${tx(ltbProductA, 3)}\\le12,\\qquad \\text{Case (b)}\\;X\\lambda_b = ${tx(ltbProductB, 3)}\\le12`}
+          status={mkStatus(ltbPass, 'PASS', 'CHECK')} />
+        <CalculationFormula caption="Overall stability result / 总体稳定结果" highlight
+          formula={`\\text{Overall stability} = ${overallOK ? 'PASS' : 'CHECK'}`}
+          status={mkStatus(overallOK, 'PASS', 'CHECK')} />
+      </CalculationSubsection>
     </CalculationSection>
   );
 }
