@@ -20,36 +20,39 @@ import calculatePrecastPanelDesign, { validateHroof } from './PrecastPanelCalcul
 import { INPUT_SECTIONS, DEFAULT_INPUTS, SUPPORT_CONDITIONS } from './PrecastPanelConfig';
 import NMInteractionChart from './NMInteractionChart';
 import PrecastPanelSVG from './PrecastPanelSVG';
-import PrecastPanelReportDialog, { PrecastPanelDetailReportDialog, CalculationReportContext} from './PrecastPanelReport';
-
+import PrecastPanelReportDialog, { PrecastPanelDetailReportDialog, CalculationReportContext } from './PrecastPanelReport';
 
 /* ============================================================================
    HELPERS
-========================================================================== */
+============================================================================ */
 const safe = (value, fallback = 0) => {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
 };
+
 const fmt = (value, digits = 2, fallback = '-') => {
   const n = Number(value);
   return Number.isFinite(n) ? n.toFixed(digits) : fallback;
 };
+
 const tx = (value, digits = 3) => {
   const v = Number(value);
   return Number.isFinite(v) ? v.toFixed(digits) : '-';
 };
+
 const txUR = (value) => {
   const v = Number(value);
   return Number.isFinite(v) ? v.toFixed(3) : '∞';
 };
+
 const txPct = (value) => {
   const v = Number(value);
   return Number.isFinite(v) ? (v * 100).toFixed(1) : '—';
 };
 
 /* ============================================================================
-   KaTeX DISPLAY COMPONENTS Katex公式的显示组件
-========================================================================== */
+   KaTeX DISPLAY COMPONENTS
+============================================================================ */
 function FormulaBlock({ children }) {
   return (
     <Box
@@ -171,10 +174,9 @@ const mkStatus = (pass, passLabel = 'PASS', failLabel = 'CHECK') => ({
   pass: Boolean(pass)
 });
 
-
 /* ============================================================================
-   INPUT COMPONENTS 几个输入组件的定义被三个页面调用
-========================================================================== */
+   INPUT COMPONENTS
+============================================================================ */
 function NumberInput({ label, value, onChange, unit, step, min, helperText, error }) {
   return (
     <TextField
@@ -260,10 +262,9 @@ function ResultRow({ label, value, unit = '', pass, warning, highlight = false }
   );
 }
 
-
 /* ============================================================================
-   INPUT TAB 输入页面的UI，三大页面第一页
-========================================================================== */
+   INPUT TAB
+============================================================================ */
 function InputTab({ inputs, setInputs, previewResults }) {
   const update = key => value => setInputs(previous => ({ ...previous, [key]: value }));
   const updateDuctility = value => {
@@ -273,6 +274,7 @@ function InputTab({ inputs, setInputs, previewResults }) {
       structuralPerformanceFactor: String(1.3 - 0.3 * safe(value, 0))
     }));
   };
+
   const hroofCheck = useMemo(() => validateHroof({
     wallHeight: safe(inputs.wallHeight),
     tf: safe(inputs.tf),
@@ -280,6 +282,7 @@ function InputTab({ inputs, setInputs, previewResults }) {
     ts: safe(inputs.ts),
     hroof: safe(inputs.hroof)
   }), [inputs.wallHeight, inputs.tf, inputs.ds, inputs.ts, inputs.hroof]);
+
   return (
     <Box>
       {/* <Alert severity="info" sx={{ mb: 2 }}>
@@ -294,6 +297,7 @@ function InputTab({ inputs, setInputs, previewResults }) {
         </Typography>
         <PrecastPanelSVG inputs={inputs} results={previewResults} showResults={false} />
       </Paper>
+
       {INPUT_SECTIONS.map(section => (
         <InputSection key={section.id} title={section.title} defaultExpanded={section.id !== 'foundation'}>
           <Grid container spacing={1.5}>
@@ -311,6 +315,7 @@ function InputTab({ inputs, setInputs, previewResults }) {
                 />
               </Grid>
             ))}
+
             {section.id === 'seismic' && (
               <>
                 <Grid item xs={12} sm={6} md={4} lg={3}>
@@ -342,6 +347,7 @@ function InputTab({ inputs, setInputs, previewResults }) {
                 </Grid>
               </>
             )}
+
             {section.id === 'support' && (
               <>
                 <Grid item xs={12} sm={6} md={4} lg={3}>
@@ -362,6 +368,7 @@ function InputTab({ inputs, setInputs, previewResults }) {
                 </Grid>
               </>
             )}
+
             {section.id === 'connection' && (
               <>
                 <Grid item xs={12} sm={6} md={4} lg={3}>
@@ -390,6 +397,7 @@ function InputTab({ inputs, setInputs, previewResults }) {
               </>
             )}
           </Grid>
+
           {section.id === 'oopGeometry' && !hroofCheck.hroofValid && (
             <Alert severity="warning" sx={{ mt: 2 }}>
               hroof ({fmt(safe(inputs.hroof), 2)} m) exceeds maximum allowed {fmt(hroofCheck.hroofMax, 2)} m.
@@ -417,8 +425,6 @@ function InputTab({ inputs, setInputs, previewResults }) {
               Seismic parameters shared between In-Plane and OOP. OOP seismic action follows
               AS/NZS 1170.5:2004 Chapter 8 (parts): Fp = Cp × H × Wp, with H = 1 + 2(hx/hn)
               and Wp = wall panel weight (computed from geometry).
-              （平面外地震作用按 AS/NZS 1170.5 第 8 章 parts 计算：Fp = Cp × H × Wp，
-              H = 1 + 2(hx/hn)，Wp 为墙板重量，由几何参数自动计算。）
             </Alert>
           )}
           {section.id === 'support' && (
@@ -431,16 +437,14 @@ function InputTab({ inputs, setInputs, previewResults }) {
           )}
           {section.id === 'connection' && (
             <Alert severity="info" sx={{ mt: 2 }}>
-              Connection check model: Dowel shear (min of steel & grout bond) + Shear friction μN* + Shear key (optional),
+              Connection check model: Dowel shear (min of steel & grout bond) + Shear friction μN + Shear key (optional),
               plus uplift and grout bed bearing checks. All capacities multiplied by ϕ Connection.
-              （连接验算模型：锚筋抗剪（钢材与灌浆粘结取小）+ 剪切摩擦 μN* + 剪力键（可选），并检查抗拔与灌浆垫承压。）
             </Alert>
           )}
           {section.id === 'inPlaneFoundation' && (
             <Alert severity="info" sx={{ mt: 2 }}>
               In-plane footing checks: Base pressure q = N/A + M/Z ≤ allowable bearing; Sliding V* ≤ μN.
               OOP bearing and footing flexure covered by UR5/UR6 (Section 13 qU).
-              （平面内基础验算：基底最大压力 q = N/A + M/Z ≤ 容许承载力；抗滑移 V* ≤ μN。）
             </Alert>
           )}
           {/* v0.6.2 —— 提示 Lintel 偏心反力将触发边缘构件局部压弯 N-M 验算（Section 10 + 11 参数） */}
@@ -448,7 +452,6 @@ function InputTab({ inputs, setInputs, previewResults }) {
             <Alert severity="info" sx={{ mt: 2 }}>
               Boundary element parameters feed the local compression-bending N-M check (Section 4.7):
               lintel reaction at wall edge + tributary gravity, with interaction curve plotted.
-              （边缘构件参数用于 4.7 节局部压弯 N-M 验算：Lintel 反力作用于墙边 + 分担重力，绘制 N-M 交互曲线。）
             </Alert>
           )}
         </InputSection>
@@ -459,7 +462,7 @@ function InputTab({ inputs, setInputs, previewResults }) {
 
 /* ============================================================================
    CALCULATION TAB — 如下是被Calculation Tab调用的各个模块
-========================================================================== */
+============================================================================ */
 const SUPPORT_MOMENT_TABLE = [
   { key: 'Pinned-Pinned', label: 'Pinned – Pinned', mid: '1/8', midVal: 0.125, base: '1/8', baseVal: 0.125 },
   { key: 'Fixed-Free', label: 'Fixed – Free (Cantilever)', mid: '1/8', midVal: 0.125, base: '1/2', baseVal: 0.5 },
@@ -468,7 +471,7 @@ const SUPPORT_MOMENT_TABLE = [
 ];
 
 /* ---------------------------------------------------------------------------
-   0. Input Summary Table（输入参数汇总表）被 Calculation Tab调用
+   0. Input Summary Table
 --------------------------------------------------------------------------- */
 function InputSummaryTable({ inputs }) {
   const rows = [
@@ -497,8 +500,6 @@ function InputSummaryTable({ inputs }) {
     ['Sp (结构性能系数)', tx(inputs.structuralPerformanceFactor), ''],
     ['Ch(T) (反应谱形状系数)', tx(inputs.spectralShapeFactor), ''],
     ['N(T,D) (近断层系数)', tx(inputs.nearFaultFactor), ''],
-    // ['Wt (抗震重量)', tx(inputs.seismicWeight), 'kN'],
-    // ['kd (分布系数)', tx(inputs.seismicDistributionFactor), ''],
     ['ψe (抗震组合系数)', tx(inputs.psiE), ''],
     /* v0.7 —— OOP part 地震参数 */
     ['OOP part coefficient Cp (平面外 part 系数, Table 8.1)', tx(inputs.partResponseCoefficient), ''],
@@ -527,8 +528,10 @@ function InputSummaryTable({ inputs }) {
     ['Footing B×L×t (平面内基础)', `${tx(inputs.footingWidth)} × ${tx(inputs.footingLength)} × ${tx(inputs.footingThickness)}`, 'm'],
     ['Allowable bearing (容许承载力)', tx(inputs.allowableBearingPressure), 'kPa']
   ];
+
   const pairs = [];
   for (let i = 0; i < rows.length; i += 2) pairs.push([rows[i], rows[i + 1]]);
+
   return (
     <TableContainer component={Paper} variant="outlined" sx={{ mb: 1 }}>
       <Table size="small">
@@ -566,7 +569,7 @@ function InputSummaryTable({ inputs }) {
 }
 
 /* ---------------------------------------------------------------------------
-   1. Geometry（几何特性与）被 Calculation Tab调用
+   Geometry
 --------------------------------------------------------------------------- */
 function GeoBlock({ inputs, ResinPlane, ResoutOfPlane }) {
   const inplanegravity = ResinPlane.gravity || {};
@@ -576,6 +579,7 @@ function GeoBlock({ inputs, ResinPlane, ResoutOfPlane }) {
   const nV = re.nVerticalBars ?? 0;
   const sl = ResinPlane.slenderness || {};
   const ch = ResinPlane.checks || {};
+
   return (
     <CalculationSection number="1" title="Geometry & Properities · 几何与特性" chip={<Chip size="small" label="AS/NZS 1170.0 / 1170.1" />}>
       <CalculationSubsection title="1.1 In-plane section properties · 平面内截面特性">
@@ -584,12 +588,12 @@ function GeoBlock({ inputs, ResinPlane, ResoutOfPlane }) {
         <CalculationFormula caption="Second moment of area / 惯性矩"
           formula={`I = \\frac{(b\\times1000)^3(t\\times1000)}{12} = \\frac{(${tx(geo.bwall)}\\times1000)^3(${tx(geo.twall)}\\times1000)}{12} = ${tx(geo.I, 0)}\\,\\mathrm{mm^4}`} />
         <CalculationFormula caption="Section modulus / 截面模量"
-          formula={`Z_g = \\frac{(b\\times1000)^2(t\\times1000)}{6} = \\frac{(${tx(geo.bwall)}\\times1000)^2(${tx(geo.twall)}\\times1000)}{6}  = ${tx(geo.Zg, 0)}\\,\\mathrm{mm^3}`} />
+          formula={`Z_g = \\frac{(b\\times1000)^2(t\\times1000)}{6} = \\frac{(${tx(geo.bwall)}\\times1000)^2(${tx(geo.twall)}\\times1000)}{6} = ${tx(geo.Zg, 0)}\\,\\mathrm{mm^3}`} />
       </CalculationSubsection>
 
       <CalculationSubsection title="1.2 Reinforcement properties · 配筋特性 (bar count from spacing)">
         <CalculationFormula caption="Number of vertical bars / 竖向分布筋根数"
-          formula={`n_v = \\left\\lfloor\\frac{b\\times1000}{s_v}\\right\\rfloor + 1 = \\left\\lfloor\\frac{${tx(geo.bwall,2)}\\times1000}{${tx(inputs.VbarSpace, 0)}}\\right\\rfloor + 1 = ${tx(nV, 0)}`} />
+          formula={`n_v = \\left\\lfloor\\frac{b\\times1000}{s_v}\\right\\rfloor + 1 = \\left\\lfloor\\frac{${tx(geo.bwall, 2)}\\times1000}{${tx(inputs.VbarSpace, 0)}}\\right\\rfloor + 1 = ${tx(nV, 0)}`} />
         <CalculationFormula caption="Distributed vertical steel / 竖向分布筋面积"
           formula={`A_{v,dist} = n_v\\pi\\phi_v^2/4 = ${tx(nV, 0)}\\times\\pi\\times${tx(inputs.VbarDia, 0)}^2/4 = ${tx(re.AsDistributed, 1)}\\,\\mathrm{mm^2}`} />
         <CalculationFormula caption="Vertical reinforcement ratio / 竖向配筋率"
@@ -614,7 +618,7 @@ function GeoBlock({ inputs, ResinPlane, ResoutOfPlane }) {
 }
 
 /* ---------------------------------------------------------------------------
-   2. In-Plane Seismic Action（荷载推算）被 Calculation Tab调用
+   2. In-Plane Seismic Action (Load Derivation)
 --------------------------------------------------------------------------- */
 function LoadDerivationBlock({ inputs, ResinPlane, ResoutOfPlane }) {
   const inplanegravity = ResinPlane.gravity || {};
@@ -622,6 +626,7 @@ function LoadDerivationBlock({ inputs, ResinPlane, ResoutOfPlane }) {
   const oopdata = ResoutOfPlane || {};
   const re = ResinPlane.reinforcement || {};
   const nV = re.nVerticalBars ?? 0;
+
   return (
     <CalculationSection number="2" title="Load Derivation · 荷载推算" chip={<Chip size="small" label="AS/NZS 1170.0 / 1170.1" />}>
       <CalculationSubsection title="2.1 Roof pressures → line loads · 屋面压力 → 线荷载 (line load = pressure × Sr)">
@@ -632,6 +637,7 @@ function LoadDerivationBlock({ inputs, ResinPlane, ResoutOfPlane }) {
         <CalculationFormula caption="Roof wind line load / 屋面风压线荷载"
           formula={`w_{wd,line} = w_{wd}\\times S_r = (${tx(inputs.wwd)}\\,\\mathrm{kPa})(${tx(inputs.Sr)}\\,\\mathrm{m}) = ${tx(safe(inputs.wwd) * safe(inputs.Sr, 1))}\\,\\mathrm{kN/m}`} />
       </CalculationSubsection>
+
       <CalculationSubsection title="2.2 In-plane self-weight & gravity ULS · 平面内自重与重力组合">
         <CalculationFormula caption="Wall self-weight / 墙体自重"
           formula={`G_{wall} = \\gamma_c\\,t\\,h\\,b = ${tx(inputs.concreteDensity)}\\times${tx(inputs.wallThickness)}\\times${tx(inputs.wallHeight)}\\times${tx(inputs.wallWidth)} = ${tx(inplanegravity.Gwall)}\\,\\mathrm{kN}`} />
@@ -642,17 +648,18 @@ function LoadDerivationBlock({ inputs, ResinPlane, ResoutOfPlane }) {
         <CalculationFormula caption="Gravity ULS axial force / 重力 ULS 轴力" highlight
           formula={`N^*_{gravity} = 1.2(G_{wall}+G_{line,total}+N_{lintel}) + 1.5\\,Q_{line,total} = 1.2\\times(${tx(inplanegravity.Gwall)}+${tx(inplanegravity.GlineTotal)}+${tx(inplanegravity.lintelReaction)}) + 1.5\\times(${tx(inplanegravity.QlineTotal)}) = ${tx(inplanegravity.Ngravity)}\\,\\mathrm{kN}`} />
       </CalculationSubsection>
+
       <CalculationSubsection title="2.3 OOP gravity axial force · 平面外重力轴力">
         <CalculationFormula caption="Roof dead line load / 屋面恒载"
           formula={`W_d = S_r\\,w_d = ${tx(inputs.Sr)}\\times${tx(inputs.gUniform)} = ${tx(oopdata.Wd_line)}\\,\\mathrm{kN/m}`} />
         <CalculationFormula caption="Wall self-weight above mid-height / 墙体自重（半高以上）"
-          formula={`N_{SW} = \\gamma_ct_w\\cdot\\frac{H_w-t_f}{2} = ${tx(inputs.concreteDensity,0)}\\cdot${tx(inputs.wallThickness)}\\cdot\\frac{${tx(inputs.wallHeight,0)}-${tx(inputs.tf,2)}}{2} = ${tx(oopdata.NSW)}\\,\\mathrm{kN/m}`} />
+          formula={`N_{SW} = \\gamma_ct_w\\cdot\\frac{H_w-t_f}{2} = ${tx(inputs.concreteDensity, 0)}\\cdot${tx(inputs.wallThickness)}\\cdot\\frac{${tx(inputs.wallHeight, 0)}-${tx(inputs.tf, 2)}}{2} = ${tx(oopdata.NSW)}\\,\\mathrm{kN/m}`} />
         <CalculationFormula caption="Footing weight / 基础自重"
-          formula={`N_{FF} = \\gamma_cL_ft_f = ${tx(inputs.concreteDensity,0)}\\cdot${tx(inputs.Lf,1)}\\cdot${tx(inputs.tf,1)} = ${tx(oopdata.NFF)}\\,\\mathrm{kN/m}`} />
+          formula={`N_{FF} = \\gamma_cL_ft_f = ${tx(inputs.concreteDensity, 0)}\\cdot${tx(inputs.Lf, 1)}\\cdot${tx(inputs.tf, 1)} = ${tx(oopdata.NFF)}\\,\\mathrm{kN/m}`} />
         <CalculationFormula caption="Slab weight / 地面板自重"
-          formula={`N_{SF} = \\gamma_c(L_f+2f_o)t_s = ${tx(inputs.concreteDensity,0)}\\cdot(${tx(inputs.Lf,0)}+2\\times${tx(inputs.fo,2)})\\cdot${tx(inputs.ts,2)} = ${tx(oopdata.NSF)}\\,\\mathrm{kN/m}`} />
+          formula={`N_{SF} = \\gamma_c(L_f+2f_o)t_s = ${tx(inputs.concreteDensity, 0)}\\cdot(${tx(inputs.Lf, 0)}+2\\times${tx(inputs.fo, 2)})\\cdot${tx(inputs.ts, 2)} = ${tx(oopdata.NSF)}\\,\\mathrm{kN/m}`} />
         <CalculationFormula caption="Hardfill weight / 硬填层自重"
-          formula={`N_{HF} = \\gamma_s(L_f+2f_o)d_s = ${tx(inputs.gs,0)}\\cdot(${tx(inputs.Lf,0)}+2\\times${tx(inputs.fo,2)})\\cdot${tx(inputs.ds,2)} = ${tx(oopdata.NHF)}\\,\\mathrm{kN/m}`} />
+          formula={`N_{HF} = \\gamma_s(L_f+2f_o)d_s = ${tx(inputs.gs, 0)}\\cdot(${tx(inputs.Lf, 0)}+2\\times${tx(inputs.fo, 2)})\\cdot${tx(inputs.ds, 2)} = ${tx(oopdata.NHF)}\\,\\mathrm{kN/m}`} />
         <CalculationFormula caption="Effective gravity axial force / 有效重力轴力" highlight
           formula={`N_{GE} = N_{SW}+N_{FF}+N_{SF}+N_{HF}+W_d = ${tx(oopdata.NSW)}+${tx(oopdata.NFF)}+${tx(oopdata.NSF)}+${tx(oopdata.NHF)}+${tx(oopdata.Wd_line)} = ${tx(oopdata.N_GE)}\\,\\mathrm{kN/m}`} />
         <CalculationFormula caption="ULS gravity envelope / ULS 重力包络"
@@ -663,11 +670,12 @@ function LoadDerivationBlock({ inputs, ResinPlane, ResoutOfPlane }) {
 }
 
 /* ---------------------------------------------------------------------------
-   3. In-Plane Seismic Action（平面内抗震作用）被 Calculation Tab调用
+   3. In-Plane Seismic Action
 --------------------------------------------------------------------------- */
 function InPlaneSeismicBlock({ inputs, inPlane, ResoutOfPlane }) {
   const inplaneseismic = inPlane.seismic || {};
   const gravity = inPlane.gravity || {};
+
   return (
     <CalculationSection number="3" title="In-Plane Seismic Action · 平面内抗震作用" chip={<Chip size="small" label="AS/NZS 1170.5 §3.2.2" />}>
       <CalculationFormula caption="Elastic site hazard coefficient / 弹性场地危险系数"
@@ -687,15 +695,16 @@ function InPlaneSeismicBlock({ inputs, inPlane, ResoutOfPlane }) {
 }
 
 /* ---------------------------------------------------------------------------
-   4. Combined In-Plane Actions（平面内组合内力）被 Calculation Tab调用
+   4. Combined In-Plane Actions
 --------------------------------------------------------------------------- */
 function InPlaneActionsBlock({ inputs, inPlane }) {
-  const gravity = inPlane.gravity || {}
+  const gravity = inPlane.gravity || {};
   const seismic = inPlane.seismic || {};
   const diaphragm = inPlane.diaphragm || {};
   const sectionactions = inPlane.sectionActions || {};
   const diaV = Math.max(safe(diaphragm.VdiaphragmWind), safe(diaphragm.VdiaphragmSeismic));
   const diaM = Math.max(safe(diaphragm.MdiaphragmWind), safe(diaphragm.MdiaphragmSeismic));
+
   return (
     <CalculationSection number="4" title="Combined In-Plane Actions · 平面内组合内力" chip={<Chip size="small" label="Seismic + Diaphragm + Lintel" />}>
       <CalculationSubsection title="4.1 Roof diaphragm horizontal forces · 屋盖隔膜水平传力 (at wall top)">
@@ -704,10 +713,12 @@ function InPlaneActionsBlock({ inputs, inPlane }) {
         <CalculationFormula caption="Diaphragm introduced moment at base / 隔膜底部弯矩"
           formula={`M_{dia} = V_{dia}\\times h = ${tx(diaV)}\\times${tx(inputs.wallHeight)} = ${tx(diaM)}\\,\\mathrm{kN\\cdot m}`} />
       </CalculationSubsection>
+
       <CalculationSubsection title="4.2 Lintel reaction & eccentricity · 过梁反力与偏心">
         <CalculationFormula caption="Lintel eccentric moment / 过梁偏心弯矩"
           formula={`M_{lintel} = R_{lintel}\\,e = ${tx(inputs.lintelReaction)}\\times(${tx(inputs.lintelEccentricity)}+${tx(inputs.wallWidth)}/2) = ${tx(sectionactions.Mlintel)}\\,\\mathrm{kN\\cdot m}`} />
       </CalculationSubsection>
+
       <CalculationSubsection title="4.3 In Plane total actions · 总内力">
         <CalculationFormula caption="Gravity Axial Force / 重力组合轴力"
           formula={`N^*_{gravity} = ${tx(gravity.Ngravity)}\\,\\mathrm{kN}`} />
@@ -715,463 +726,41 @@ function InPlaneActionsBlock({ inputs, inPlane }) {
           formula={`M^* = M^*_{seismic}+M_{dia}+M_{lintel} = ${tx(seismic.Mseismic)}+${tx(diaM)}+${tx(sectionactions.Mlintel)} = ${tx(sectionactions.Mtotal)}\\,\\mathrm{kN\\cdot m}`} />
         <CalculationFormula caption="Total in-plane shear / 总剪力" highlight
           formula={`V^* = V^*_{seismic}+V_{dia} = ${tx(seismic.Vseismic)}+${tx(diaV)} = ${tx(sectionactions.Vtotal)}\\,\\mathrm{kN}`} />
-        {/* <CalculationFormula caption="Compression end axial force / 受压端的轴力" highlight
-          formula={`N^*_{comp} = N_{EQ,g}+R_{lintel} = ${tx(sectionactions.seismicGravity)}+${tx(inputs.lintelReaction)} = ${tx(sectionactions.NseismicCompression)}\\,\\mathrm{kN}`} />
-        <CalculationFormula caption="Tension end axial force / 受拉端的轴力"
-          formula={`N^*_{tension} = N_{EQ,g}-R_{lintel} = ${tx(sectionactions.seismicGravity)}-${tx(inputs.lintelReaction)} = ${tx(sectionactions.NseismicTension)}\\,\\mathrm{kN}`}
-          status={mkStatus(safe(sectionactions.NseismicTension) >= 0, 'COMPRESSION', 'TENSION / UPLIFT')} /> */}
       </CalculationSubsection>
     </CalculationSection>
   );
 }
 
 /* ---------------------------------------------------------------------------
-   5. In-Plane Section Checks（平面内截面验算）Calculation Tab调用
+   5. In-Plane Section Checks (UI & Data Reading ONLY)
+   计算逻辑已完全移至 PrecastPanelCalculation-revised.js
 --------------------------------------------------------------------------- */
 function InPlaneChecksBlock({ inputs, inPlane }) {
-
-  const geo = inPlane.geometry || {};
-  const gravity = inPlane.gravity || {};
-  const sectionactions = inPlane.sectionActions || {};
-  const es = inPlane.elasticStress || {};
-  const re = inPlane.reinforcement || {};
-  const sh = inPlane.shear || {};
+  const sc = inPlane.sectionChecks || {};
   const ch = inPlane.checks || {};
-
-  const lw = safe(geo.bwall || inputs.wallWidth); // m
-  const tw = safe(geo.twall || inputs.wallThickness); // m
-  const L = lw * 1000; // mm, wall length / bending depth
-  const t = tw * 1000; // mm, wall thickness / compression width
-
-  /*
-   * Design axial force, moment and shear
-   */
-  const Nstar = safe(sectionactions.Ntotal || gravity.Ngravity); // kN
-  const Mstar = safe(sectionactions.Mtotal); // kN.m
-  const Vstar = safe(sectionactions.Vtotal); // kN
-
-  /* ========================================================================
-     MATERIAL PROPERTIES
-  ========================================================================= */
-
-  const fc = safe(inputs.fc); // MPa
-  const fy = safe(inputs.fy); // MPa
-  const Es = 200000; // MPa
-  const epsCu = 0.003;
-
-  /*
-   * Equivalent rectangular compression block
-   *
-   * For normal-strength concrete:
-   * alpha1 = 0.85
-   * beta1  = 0.85
-   *
-   * These can later be replaced with exact NZS 3101
-   * strength-dependent parameters if desired.
-   */
-
-  const alpha1 = 0.85;
-  const beta1 = 0.85;
-
-  /*
-   * Strength reduction factor
-   */
-
-  const phiFlexure = safe(inputs.phiFlexure, 0.85);
-
-  /* ========================================================================
-     SECTION GEOMETRY
-  ========================================================================= */
-
-  const Ag = geo.Ag; // mm2
-  const Zg = geo.Zg; // mm3
-  const Ig = geo.I; // mm4
-
-  const eccentricity = es.eccentricity; // m
-
-  /*
-   * Rectangular section kern:
-   *
-   * e <= L/6 → entire section compression
-   * e >  L/6 → tensile stress occurs
-   */
-  const kernLimit = lw / 6; // m
-  const cracked = eccentricity > kernLimit;
-
-  /*
-   * Elastic stress
-   */
-
-  const sigmaN = es.sigmaN;
-  const sigmaM = es.sigmaM;
-  const sigmaMax = es.sigmaMax;
-  const sigmaMin = es.sigmaMin;
-
-  /* ========================================================================
-     BUILD VERTICAL REINFORCEMENT LAYOUT
-     
-     Coordinate system:
-     
-     x = 0        compression edge
-     x = L        tension edge
-     
-     Distributed vertical bars:
-     placed across entire wall length
-     
-     Boundary bars:
-     added at both ends
-  ========================================================================= */
-
-  const cover = safe(inputs.cover); // mm
-  const VbarDia = safe(inputs.VbarDia); // mm
-  const VbarSpace = safe(inputs.VbarSpace); // mm
-  const boundaryBarCount = Math.round(safe(inputs.boundaryBarCount));
-  const boundaryBarDia = safe(inputs.boundaryBarDiameter); // mm
-  const boundaryWidth = safe(inputs.boundaryWidth) * 1000; // mm
-
-  /*
-   * Distributed vertical reinforcement
-   */
-
-  const AsDistributedBar = Math.PI * Math.pow(VbarDia, 2) / 4;
-
-  /*
-   * Boundary reinforcement
-   */
-
-  const AsBoundaryBar = Math.PI * Math.pow(boundaryBarDia, 2) / 4;
-  const bars = [];
-
-  /*
-   * ------------------------------------------------------------
-   * Distributed vertical reinforcement
-   * ------------------------------------------------------------
-   */
-
-  if (VbarDia > 0 && VbarSpace > 0 && L > 0) {
-    const nBars = Math.max(2, Math.floor((L - 2 * cover) / VbarSpace) + 1);
-    for (let i = 0; i < nBars; i++) {
-      const x = nBars === 1 ? L / 2 : cover + i * ((L - 2 * cover) / (nBars - 1));
-      bars.push({ x, As: AsDistributedBar, type: 'distributed' });
-    }
-  }
-
-  /*
-   * ------------------------------------------------------------
-   * Boundary reinforcement
-   *
-   * Split total boundary bars equally between two wall ends.
-   *
-   * If odd number:
-   * extra bar assigned to compression-side boundary.
-   * ------------------------------------------------------------
-   */
-
-  if (boundaryBarCount > 0 && boundaryBarDia > 0) {
-    const nLeft = Math.ceil(boundaryBarCount / 2);
-    const nRight = Math.floor(boundaryBarCount / 2);
-
-    /*
-     * Approximate bar spacing inside boundary zone
-     */
-
-    const availableBoundaryWidth = Math.max(boundaryWidth - 2 * cover, boundaryBarDia);
-
-    /*
-     * Left boundary
-     */
-
-    for (let i = 0; i < nLeft; i++) {
-      const spacing = nLeft > 1 ? availableBoundaryWidth / (nLeft - 1) : 0;
-      const x = Math.min(cover + i * spacing, L - cover);
-      bars.push({ x, As: AsBoundaryBar, type: 'boundary-left' });
-    }
-
-    /*
-     * Right boundary
-     */
-
-    for (let i = 0; i < nRight; i++) {
-      const spacing = nRight > 1 ? availableBoundaryWidth / (nRight - 1) : 0;
-      const x = Math.max(cover, L - cover - i * spacing);
-      bars.push({ x, As: AsBoundaryBar, type: 'boundary-right' });
-    }
-  }
-
-  /*
-   * Total reinforcement
-   */
-
-  const AsTotal = bars.reduce((sum, bar) => sum + bar.As, 0);
-
-  /* ========================================================================
-     STRAIN COMPATIBILITY SECTION SOLVER
-
-     For a trial neutral axis depth c:
-
-                  Compression
-                     │
-                     ▼
-           ┌─────────────────┐
-           │████████         │
-           │████████         │ ← compression block a
-           │████████         │
-           │                 │
-           │       NA        │ ← c
-           │                 │
-           │                 │
-           │                 │
-           └─────────────────┘
-                     ▲
-                     │
-                  Tension
-
-     Strain:
-     εs = εcu (1 - x/c)
-     Stress:
-     fs = Es εs
-     limited:
-     -fy ≤ fs ≤ fy
-  ========================================================================= */
-
-  function evaluateSection(c) {
-
-    /*
-     * Limit compression block
-     */
-
-    const a = Math.min(beta1 * c, L);
-
-    /*
-     * Concrete compression force
-     *
-     * Cc = alpha1 fc b a
-     *
-     * MPa × mm × mm = N
-     */
-    const Cc = alpha1 * fc * t * a;
-
-    /*
-     * Compression block resultant
-     */
-
-    const xCc = a / 2;
-    let steelAxial = 0;
-    let steelMomentAboutEdge = 0;
-
-    const steelResults = [];
-
-    bars.forEach(bar => {
-
-      /*
-       * Positive strain = compression
-       *
-       * x < c → compression
-       * x > c → tension
-       */
-
-      const strain = epsCu * (1 - bar.x / c);
-
-      /*
-       * Elastic-perfectly-plastic steel
-       */
-
-      let stress = Es * strain;
-      stress = Math.max(-fy, Math.min(fy, stress));
-
-      /*
-       * Steel force
-       *
-       * Compression = positive
-       * Tension = negative
-       */
-
-      const force = bar.As * stress;
-      steelAxial += force;
-      steelMomentAboutEdge += force * bar.x;
-
-      steelResults.push({
-        ...bar,
-        strain,
-        stress,
-        force,
-        forcekN: force / 1000
-      });
-    });
-
-    /*
-     * Nominal axial capacity
-     */
-
-    const Pn = Cc + steelAxial;
-
-    /*
-     * Moment about compression edge
-     */
-
-    const momentAboutEdge = Cc * xCc + steelMomentAboutEdge;
-
-    /*
-     * Convert to moment about section centroid
-     *
-     * M = ΣF × (x - L/2)
-     */
-
-    const centroid = L / 2;
-    const Mn = Math.abs(momentAboutEdge - Pn * centroid);
-
-    /*
-     * Split steel forces
-     */
-
-    const compressionSteel = steelResults.filter(item => item.force > 0).reduce((sum, item) => sum + item.force, 0);
-    const tensionSteel = steelResults.filter(item => item.force < 0).reduce((sum, item) => sum + Math.abs(item.force), 0);
-
-    return {
-      c,
-      a,
-      Cc,
-      steelAxial,
-      Pn,
-      Mn,
-      steelResults,
-      compressionSteel,
-      tensionSteel
-    };
-  }
-
-  /* ========================================================================
-     NEUTRAL AXIS SOLVER
-     Solve:
-
-     Pn(c) = N*
-
-     using bisection.
-
-     Ntarget:
-     kN → N
-  ========================================================================= */
-
-  const Ntarget = Nstar * 1000;
-  let cLow = Math.max(0.1, L * 0.0001);
-  let cHigh = Math.max(L * 20, 1000);
-  let sectionResult = null;
-
-  /*
-   * Check end values
-   */
-
-  let lowResult = evaluateSection(cLow);
-  let highResult = evaluateSection(cHigh);
-
-  /*
-   * Expand search range if necessary
-   */
-
-  let expandCount = 0;
-  while ((lowResult.Pn - Ntarget) * (highResult.Pn - Ntarget) > 0 && expandCount < 20) {
-    cHigh *= 2;
-    highResult = evaluateSection(cHigh);
-    expandCount++;
-  }
-
-  /*
-   * Bisection
-   */
-
-  for (let i = 0; i < 120; i++) {
-    const cMid = (cLow + cHigh) / 2;
-    const result = evaluateSection(cMid);
-    const error = result.Pn - Ntarget;
-    sectionResult = result;
-
-    /*
-     * Convergence tolerance
-     */
-
-    if (Math.abs(error) < Math.max(10, Math.abs(Ntarget) * 1e-6)) {
-      break;
-    }
-
-    /*
-     * Bisection direction
-     */
-
-    const lowError = lowResult.Pn - Ntarget;
-    if (lowError * error <= 0) {
-      cHigh = cMid;
-      highResult = result;
-    } else {
-      cLow = cMid;
-      lowResult = result;
-    }
-  }
-
-  /*
-   * Fallback
-   */
-
-  if (!sectionResult) { sectionResult = evaluateSection(L / 2);}
-
-  /* ========================================================================
-     SECTION CAPACITY RESULTS
-  ========================================================================= */
-
-  const neutralAxis = sectionResult.c;
-  const compressionBlockDepth = sectionResult.a;
-  const concreteCompression = sectionResult.Cc;
-  const nominalAxial = sectionResult.Pn / 1000; // kN
-  const nominalMoment = sectionResult.Mn / 1e6; // kN.m
-  const phiMn = phiFlexure * nominalMoment;
-  const momentRatio = phiMn > 0 ? Mstar / phiMn : Infinity;
-
-  /*
-   * Axial capacity reference
-   *
-   * Pure compression reference only
-   */
-
-  const P0 = alpha1 * fc * Ag + AsTotal * fy;
-  const phiPn = phiFlexure * P0 / 1000;
-  const axialRatio = phiPn > 0 ? Nstar / phiPn : 0;
-
-  /*
-   * Main interaction utilisation
-   *
-   * Capacity is solved at actual N*
-   */
-  const interactionRatio = momentRatio;
-
-  /* ========================================================================
-     LOW AXIAL LOAD RATIO
-  ========================================================================= */
-
-  const grossConcreteCapacity = fc * Ag; // N
-  const lowAxialRatio = grossConcreteCapacity > 0 ? Ntarget / grossConcreteCapacity : 0;
-
-  /* ========================================================================
-     STEEL SUMMARY
-  ========================================================================= */
-
-  const steelResults = sectionResult.steelResults || [];
-  const compressionSteelForce = sectionResult.compressionSteel || 0;
-  const tensionSteelForce = sectionResult.tensionSteel || 0;
-  const yieldedBars = steelResults.filter(item => Math.abs(item.stress) >= fy * 0.999).length;
-  const compressionBars = steelResults.filter(item => item.force > 0).length;
-  const tensionBars = steelResults.filter(item => item.force < 0).length;
-
-  /* ========================================================================
-     RENDER
-  ========================================================================= */
+  const sh = inPlane.shear || {};
+
+  const {
+    lw, tw, L, t,
+    Nstar, Mstar, Vstar,
+    fc, fy, Es, epsCu, alpha1, beta1, phiFlexure,
+    Ag, Zg, Ig, eccentricity, kernLimit, cracked,
+    sigmaN, sigmaM, sigmaMax, sigmaMin,
+    cover, VbarDia, VbarSpace, boundaryBarCount, boundaryBarDia, boundaryWidth,
+    AsDistributedBar, AsBoundaryBar, bars, AsTotal,
+    neutralAxis, compressionBlockDepth, concreteCompression,
+    nominalAxial, nominalMoment, phiMn, momentRatio,
+    P0, phiPn, axialRatio, interactionRatio,
+    grossConcreteCapacity, lowAxialRatio,
+    steelResults, compressionSteelForce, tensionSteelForce,
+    yieldedBars, compressionBars, tensionBars
+  } = sc;
 
   return (
     <CalculationSection number="5" title="In-Plane Section Checks · 平面内截面验算"
-      chip={<Chip size="small" label="NZS 3101 + Strain Compatibility"/>} >
-
-      {/* ================================================================ */}
+      chip={<Chip size="small" label="NZS 3101 + Strain Compatibility" />} >
+      
       {/* 5.1 ELASTIC STRESS */}
-      {/* ================================================================ */}
-
       <CalculationSubsection title="5.1 First-order elastic stress distribution · 一阶弹性应力分布" >
         <CalculationFormula
           caption="Uniform axial stress / 均匀轴压应力"
@@ -1190,11 +779,7 @@ function InPlaneChecksBlock({ inputs, inPlane }) {
           status={mkStatus(sigmaMin >= 0, 'NO TENSION', 'TENSION / CRACKING')} />
       </CalculationSubsection>
 
-
-      {/* ================================================================ */}
       {/* 5.2 ECCENTRICITY */}
-      {/* ================================================================ */}
-
       <CalculationSubsection title="5.2 Resultant eccentricity & cracking classification · 偏心距与开裂判断" >
         <CalculationFormula
           caption="Resultant eccentricity / 合力偏心距"
@@ -1213,10 +798,7 @@ function InPlaneChecksBlock({ inputs, inPlane }) {
           status={mkStatus(!cracked, 'UNCRACKED', 'CRACKED SECTION')} />
       </CalculationSubsection>
 
-      {/* ================================================================ */}
       {/* 5.3 REINFORCEMENT */}
-      {/* ================================================================ */}
-
       <CalculationSubsection title="5.3 Vertical reinforcement model · 竖向钢筋截面模型" >
         <CalculationFormula
           caption="Distributed reinforcement bar area / 分布钢筋单根面积"
@@ -1230,10 +812,7 @@ function InPlaneChecksBlock({ inputs, inPlane }) {
           highlight />
       </CalculationSubsection>
 
-      {/* ================================================================ */}
       {/* 5.4 STRAIN COMPATIBILITY */}
-      {/* ================================================================ */}
-
       <CalculationSubsection title="5.4 NZS 3101 strain compatibility · 应变协调与中性轴求解" >
         <CalculationFormula
           caption="Ultimate concrete strain / 极限混凝土压应变"
@@ -1265,10 +844,7 @@ function InPlaneChecksBlock({ inputs, inPlane }) {
           formula={`C_s = ${tx(compressionSteelForce / 1000, 2)} \\,\\mathrm{kN}, \\qquad T_s = ${tx(tensionSteelForce / 1000, 2)} \\,\\mathrm{kN}`} />
       </CalculationSubsection>
 
-      {/* ================================================================ */}
       {/* 5.5 MOMENT CAPACITY */}
-      {/* ================================================================ */}
-
       <CalculationSubsection title="5.5 Section N-M capacity at applied axial load · 给定轴力下截面抗弯承载力" >
         <CalculationFormula
           caption="Nominal axial force equilibrium / 名义轴力"
@@ -1287,10 +863,7 @@ function InPlaneChecksBlock({ inputs, inPlane }) {
           status={mkStatus(momentRatio <= 1, 'PASS', 'CHECK')} />
       </CalculationSubsection>
 
-      {/* ================================================================ */}
       {/* 5.6 AXIAL LOAD LEVEL */}
-      {/* ================================================================ */}
-
       <CalculationSubsection title="5.6 Axial load level · 轴压水平与低轴力特征" >
         <CalculationFormula
           caption="Gross-section axial load ratio / 毛截面轴压比"
@@ -1308,10 +881,7 @@ function InPlaneChecksBlock({ inputs, inPlane }) {
           formula={`UR_N = \\frac{N^*}{\\phi P_0} = ${tx(axialRatio, 4)} = ${txPct(axialRatio)} \\%`} />
       </CalculationSubsection>
 
-      {/* ================================================================ */}
       {/* 5.7 IN-PLANE SHEAR */}
-      {/* ================================================================ */}
-
       <CalculationSubsection title="5.7 In-plane shear · 平面内抗剪" >
         <CalculationFormula
           caption="Web width & shear depth / 腹板宽度与有效剪深"
@@ -1336,131 +906,126 @@ function InPlaneChecksBlock({ inputs, inPlane }) {
   );
 }
 
-
 /* ---------------------------------------------------------------------------
-6. OUT-OF-PLANE DESIGN (WIND & SEISMIC) 
+   6. OUT-OF-PLANE DESIGN (WIND & SEISMIC)
 --------------------------------------------------------------------------- */
 function OutOfPlaneWindSeismicBlock({ inputs, outOfPlane }) {
-const oopResult = outOfPlane || {};
-const hv = oopResult.hroofValidation || {};
-const sc = oopResult.supportConditions || {};
-const add = oopResult.additionalLoads || {};
-const ps = oopResult.partSeismic || {};
-const wsF = sc.windSeismicFactors || { mid: 1 / 8, base: 1 / 8 };
-const hroofEff = safe(hv.hroofEffective);
+  const oopResult = outOfPlane || {};
+  const hv = oopResult.hroofValidation || {};
+  const sc = oopResult.supportConditions || {};
+  const add = oopResult.additionalLoads || {};
+  const ps = oopResult.partSeismic || {};
+  const wsF = sc.windSeismicFactors || { mid: 1 / 8, base: 1 / 8 };
+  const hroofEff = safe(hv.hroofEffective);
 
-return (
- <CalculationSection number="6" title="Out-of-Plane Design (Wind & Seismic) · 平面外设计（风与地震）" chip={<Chip size="small" label="AS/NZS 1170.5 Ch.8 / NZS 3101" />}>
-   
-   <CalculationSubsection title="6.1 hroof validation & Lateral Actions · hroof 校验与水平作用">
-     <CalculationFormula caption="Effective hroof used / 实际采用值" highlight
-       formula={`h_{roof,eff} = \\min(h_{roof},\\,h_{roof,max}) = ${tx(hv.hroofEffective)}\\,\\mathrm{m}`}
-       status={mkStatus(hv.hroofValid, 'VALID', 'CLAMPED')} />
-     <CalculationFormula caption="Part height amplification factor H / part 高度放大系数 (§8.4.2.3)"
-       formula={`H = 1 + 2\\frac{h_x}{h_n} = 1 + 2\\times\\frac{${tx(ps.hx)}}{${tx(ps.hn)}} = ${tx(ps.H, 3)}`} />
-     <CalculationFormula caption="Wall panel weight Wp / 墙板重量（每延米）"
-       formula={`W_p = \\gamma_c\\,t_w\\,h_{roof} = ${tx(ps.Wp)}\\,\\mathrm{kN/m}`} />
-     <CalculationFormula caption="Part component factor Cp / Part 构件系数 (§8.4.2.1)"
-       formula={`C_p = \\frac{a_p\\,S_p}{R_p\\,\\mu_p} = ${tx(ps.Cp, 3)}`} />
-     <CalculationFormula caption="Design seismic force Fp,design / 控制设计地震力" highlight
-       formula={`F_{p,design} = \\max(C_p H W_p,\\,0.3 S_p I W_p) = ${tx(ps.Fp_design)}\\,\\mathrm{kN/m}`} />
-     <CalculationFormula caption="OOP seismic pressure WE / 平面外地震压力"
-       formula={`W_E = \\frac{F_{p,design}}{h_{roof}} = ${tx(oopResult.WE)}\\,\\mathrm{kPa}`} />
-     <CalculationFormula caption="Governing wind pressure / 控制风压"
-       formula={`W_{pressure} = \\max(w_{wd},\\,w_{wf}) = ${tx(oopResult.WindPressure)}\\,\\mathrm{kPa}`} />
-   </CalculationSubsection>
+  return (
+    <CalculationSection number="6" title="Out-of-Plane Design (Wind & Seismic) · 平面外设计（风与地震）" chip={<Chip size="small" label="AS/NZS 1170.5 Ch.8 / NZS 3101" />}>
+      <CalculationSubsection title="6.1 hroof validation & Lateral Actions · hroof 校验与水平作用">
+        <CalculationFormula caption="Effective hroof used / 实际采用值" highlight
+          formula={`h_{roof,eff} = \\min(h_{roof},\\,h_{roof,max}) = ${tx(hv.hroofEffective)}\\,\\mathrm{m}`}
+          status={mkStatus(hv.hroofValid, 'VALID', 'CLAMPED')} />
+        <CalculationFormula caption="Part height amplification factor H / part 高度放大系数 (§8.4.2.3)"
+          formula={`H = 1 + 2\\frac{h_x}{h_n} = 1 + 2\\times\\frac{${tx(ps.hx)}}{${tx(ps.hn)}} = ${tx(ps.H, 3)}`} />
+        <CalculationFormula caption="Wall panel weight Wp / 墙板重量（每延米）"
+          formula={`W_p = \\gamma_c\\,t_w\\,h_{roof} = ${tx(ps.Wp)}\\,\\mathrm{kN/m}`} />
+        <CalculationFormula caption="Part component factor Cp / Part 构件系数 (§8.4.2.1)"
+          formula={`C_p = \\frac{a_p\\,S_p}{R_p\\,\\mu_p} = ${tx(ps.Cp, 3)}`} />
+        <CalculationFormula caption="Design seismic force Fp,design / 控制设计地震力" highlight
+          formula={`F_{p,design} = \\max(C_p H W_p,\\,0.3 S_p I W_p) = ${tx(ps.Fp_design)}\\,\\mathrm{kN/m}`} />
+        <CalculationFormula caption="OOP seismic pressure WE / 平面外地震压力"
+          formula={`W_E = \\frac{F_{p,design}}{h_{roof}} = ${tx(oopResult.WE)}\\,\\mathrm{kPa}`} />
+        <CalculationFormula caption="Governing wind pressure / 控制风压"
+          formula={`W_{pressure} = \\max(w_{wd},\\,w_{wf}) = ${tx(oopResult.WindPressure)}\\,\\mathrm{kPa}`} />
+      </CalculationSubsection>
 
-   <CalculationSubsection title="6.2 Bending Moments & Support Conditions · 弯矩与支承条件">
-     <Box sx={{ overflowX: 'auto', mb: 1.5 }}>
-       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-         <thead>
-           <tr>
-             {['Support condition', 'Mid-height k', 'Base k', 'Assigned to'].map(hd => (
-               <th key={hd} style={{ textAlign: 'left', padding: '6px 10px', borderBottom: '2px solid #e5e7eb', fontWeight: 800 }}>{hd}</th>
-             ))}
-           </tr>
-         </thead>
-         <tbody>
-           {SUPPORT_MOMENT_TABLE.map(row => {
-             const isWS = (sc.windSeismic || 'Pinned-Pinned') === row.key;
-             return (
-               <tr key={row.key} style={{ background: isWS ? '#f0f7ff' : 'transparent' }}>
-                 <td style={{ padding: '6px 10px', borderBottom: '1px solid #eee', fontWeight: 600 }}>{row.label}</td>
-                 <td style={{ padding: '6px 10px', borderBottom: '1px solid #eee' }}>{row.mid}</td>
-                 <td style={{ padding: '6px 10px', borderBottom: '1px solid #eee' }}>{row.base}</td>
-                 <td style={{ padding: '6px 10px', borderBottom: '1px solid #eee' }}>
-                   {isWS && <Chip size="small" color="primary" label="Wind & Seismic" />}
-                   {!isWS && <span style={{ color: '#9ca3af' }}>—</span>}
-                 </td>
-               </tr>
-             );
-           })}
-         </tbody>
-       </table>
-     </Box>
-     <CalculationFormula caption="Mid-height design moment Ma / 中部设计弯矩" highlight
-       formula={`M_a = \\max(M_E,M_W)\\,k_{mid} + \\Delta M_{add,mid} = ${tx(oopResult.Ma)}\\,\\mathrm{kN\\cdot m/m}`} />
-     <CalculationFormula caption="Base design moments MbE, MbW / 底部设计弯矩"
-       formula={`M_{bE} = ${tx(oopResult.MbE)}\\,\\mathrm{kN\\cdot m/m},\\quad M_{bW} = ${tx(oopResult.MbW)}\\,\\mathrm{kN\\cdot m/m}`} />
-   </CalculationSubsection>
+      <CalculationSubsection title="6.2 Bending Moments & Support Conditions · 弯矩与支承条件">
+        <Box sx={{ overflowX: 'auto', mb: 1.5 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr>
+                {['Support condition', 'Mid-height k', 'Base k', 'Assigned to'].map(hd => (
+                  <th key={hd} style={{ textAlign: 'left', padding: '6px 10px', borderBottom: '2px solid #e5e7eb', fontWeight: 800 }}>{hd}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {SUPPORT_MOMENT_TABLE.map(row => {
+                const isWS = (sc.windSeismic || 'Pinned-Pinned') === row.key;
+                return (
+                  <tr key={row.key} style={{ background: isWS ? '#f0f7ff' : 'transparent' }}>
+                    <td style={{ padding: '6px 10px', borderBottom: '1px solid #eee', fontWeight: 600 }}>{row.label}</td>
+                    <td style={{ padding: '6px 10px', borderBottom: '1px solid #eee' }}>{row.mid}</td>
+                    <td style={{ padding: '6px 10px', borderBottom: '1px solid #eee' }}>{row.base}</td>
+                    <td style={{ padding: '6px 10px', borderBottom: '1px solid #eee' }}>
+                      {isWS && <Chip size="small" color="primary" label="Wind & Seismic" />}
+                      {!isWS && <span style={{ color: '#9ca3af' }}>—</span>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </Box>
+        <CalculationFormula caption="Mid-height design moment Ma / 中部设计弯矩" highlight
+          formula={`M_a = \\max(M_E,M_W)\\,k_{mid} + \\Delta M_{add,mid} = ${tx(oopResult.Ma)}\\,\\mathrm{kN\\cdot m/m}`} />
+        <CalculationFormula caption="Base design moments MbE, MbW / 底部设计弯矩"
+          formula={`M_{bE} = ${tx(oopResult.MbE)}\\,\\mathrm{kN\\cdot m/m},\\quad M_{bW} = ${tx(oopResult.MbW)}\\,\\mathrm{kN\\cdot m/m}`} />
+      </CalculationSubsection>
 
-   <CalculationSubsection title="6.3 Flexural Capacity & P-Delta · 抗弯承载力与 P-Δ 效应">
-     <CalculationFormula caption="Flexural capacity φMn / 抗弯承载力" highlight
-       formula={`\\phi M_n = 0.85\\,A_{WV}f_y\\left(d-\\frac{a}{2}\\right)/10^6 = ${tx(oopResult.phiMn)}\\,\\mathrm{kN\\cdot m/m}`} />
-     <CalculationFormula caption="P-Delta magnified moment M' / P-Δ 放大弯矩" highlight
-       formula={`M' = \\frac{M_a}{1-\\dfrac{5N_a h_{roof}^2}{0.75\\times48\\,E_c I_{cr}}} = ${tx(oopResult.M_prime)}\\,\\mathrm{kN\\cdot m/m}`} />
-     <CalculationFormula caption="Mid-height utilisation UR1 / 中部利用率" highlight
-       formula={`UR_1 = \\frac{M'}{\\phi M_n} = ${txPct(oopResult.UR1)}\\%`}
-       status={mkStatus(Number.isFinite(oopResult.UR1) && oopResult.UR1 <= 1, 'PASS', 'CHECK')} />
-     <CalculationFormula caption="Base utilisation UR2 / 底部利用率" highlight
-       formula={`UR_2 = \\frac{\\max(M_{bE},M_{bW})}{\\phi M_n} = ${txPct(oopResult.UR2)}\\%`}
-       status={mkStatus(Number.isFinite(oopResult.UR2) && oopResult.UR2 <= 1, 'PASS', 'CHECK')} />
-   </CalculationSubsection>
+      <CalculationSubsection title="6.3 Flexural Capacity & P-Delta · 抗弯承载力与 P-Δ 效应">
+        <CalculationFormula caption="Flexural capacity φMn / 抗弯承载力" highlight
+          formula={`\\phi M_n = 0.85\\,A_{WV}f_y\\left(d-\\frac{a}{2}\\right)/10^6 = ${tx(oopResult.phiMn)}\\,\\mathrm{kN\\cdot m/m}`} />
+        <CalculationFormula caption="P-Delta magnified moment M' / P-Δ 放大弯矩" highlight
+          formula={`M' = \\frac{M_a}{1-\\dfrac{5N_a h_{roof}^2}{0.75\\times48\\,E_c I_{cr}}} = ${tx(oopResult.M_prime)}\\,\\mathrm{kN\\cdot m/m}`} />
+        <CalculationFormula caption="Mid-height utilisation UR1 / 中部利用率" highlight
+          formula={`UR_1 = \\frac{M'}{\\phi M_n} = ${txPct(oopResult.UR1)}\\%`}
+          status={mkStatus(Number.isFinite(oopResult.UR1) && oopResult.UR1 <= 1, 'PASS', 'CHECK')} />
+        <CalculationFormula caption="Base utilisation UR2 / 底部利用率" highlight
+          formula={`UR_2 = \\frac{\\max(M_{bE},M_{bW})}{\\phi M_n} = ${txPct(oopResult.UR2)}\\%`}
+          status={mkStatus(Number.isFinite(oopResult.UR2) && oopResult.UR2 <= 1, 'PASS', 'CHECK')} />
+      </CalculationSubsection>
 
-   <CalculationSubsection title="6.4 Shear Capacity · 抗剪承载力">
-     <CalculationFormula caption="Shear utilisation UR4 / 抗剪利用率" highlight
-       formula={`UR_4 = \\frac{\\max(V_E,V_w)}{0.75(V_c+V_s)} = ${txPct(oopResult.UR4)}\\%`}
-       status={mkStatus(Number.isFinite(oopResult.UR4) && oopResult.UR4 <= 1, 'PASS', 'CHECK')} />
-   </CalculationSubsection>
-
- </CalculationSection>
-);
+      <CalculationSubsection title="6.4 Shear Capacity · 抗剪承载力">
+        <CalculationFormula caption="Shear utilisation UR4 / 抗剪利用率" highlight
+          formula={`UR_4 = \\frac{\\max(V_E,V_w)}{0.75(V_c+V_s)} = ${txPct(oopResult.UR4)}\\%`}
+          status={mkStatus(Number.isFinite(oopResult.UR4) && oopResult.UR4 <= 1, 'PASS', 'CHECK')} />
+      </CalculationSubsection>
+    </CalculationSection>
+  );
 }
 
 /* ---------------------------------------------------------------------------
-7. OUT-OF-PLANE FIRE RESISTANCE DESIGN 
+   7. OUT-OF-PLANE FIRE RESISTANCE DESIGN
 --------------------------------------------------------------------------- */
 function OutOfPlaneFireBlock({ inputs, outOfPlane }) {
-const oopResult = outOfPlane || {};
-const sc = oopResult.supportConditions || {};
-const HwMinusTf = safe(inputs.wallHeight) - safe(inputs.tf) / 1000;
+  const oopResult = outOfPlane || {};
+  const sc = oopResult.supportConditions || {};
+  const HwMinusTf = safe(inputs.wallHeight) - safe(inputs.tf) / 1000;
 
-return (
- <CalculationSection number="7" title="Out-of-Plane Fire Resistance Design · 平面外抗火设计" chip={<Chip size="small" label="NZS 3101 / BRANZ Guide" />}>
-   
-   <CalculationSubsection title="7.1 Fire Actions & Material Properties · 火灾作用与材料折减">
-     <CalculationFormula caption="Axis distance xt / 钢筋轴向距离"
-       formula={`x_t = \\frac{t_w}{2}-\\frac{\\phi_v}{2}-\\phi_h = ${tx(oopResult.xt, 1)}\\,\\mathrm{mm}`} />
-     <CalculationFormula caption="Reduction factors / 温度折减系数"
-       formula={`\\eta_x = 0.16\\ln(t_h x_t^{-2})-0.65 = ${tx(oopResult.etax, 3)},\\qquad \\eta_w = 1-0.162\\,t_h^{-0.6} = ${tx(oopResult.etaw, 3)}`} />
-     <CalculationFormula caption="Steel temperature & reduced yield / 钢筋温度与折减屈服"
-       formula={`T_{fs} = \\eta_x\\eta_w\\times660 = ${tx(oopResult.Tfs, 0)}\\,^{\\circ}\\mathrm{C},\\qquad f_{yt} = ${tx(oopResult.fyt, 0)}\\,\\mathrm{MPa}`} />
-   </CalculationSubsection>
+  return (
+    <CalculationSection number="7" title="Out-of-Plane Fire Resistance Design · 平面外抗火设计" chip={<Chip size="small" label="NZS 3101 / BRANZ Guide" />}>
+      <CalculationSubsection title="7.1 Fire Actions & Material Properties · 火灾作用与材料折减">
+        <CalculationFormula caption="Axis distance xt / 钢筋轴向距离"
+          formula={`x_t = \\frac{t_w}{2}-\\frac{\\phi_v}{2}-\\phi_h = ${tx(oopResult.xt, 1)}\\,\\mathrm{mm}`} />
+        <CalculationFormula caption="Reduction factors / 温度折减系数"
+          formula={`\\eta_x = 0.16\\ln(t_h x_t^{-2})-0.65 = ${tx(oopResult.etax, 3)},\\qquad \\eta_w = 1-0.162\\,t_h^{-0.6} = ${tx(oopResult.etaw, 3)}`} />
+        <CalculationFormula caption="Steel temperature & reduced yield / 钢筋温度与折减屈服"
+          formula={`T_{fs} = \\eta_x\\eta_w\\times660 = ${tx(oopResult.Tfs, 0)}\\,^{\\circ}\\mathrm{C},\\qquad f_{yt} = ${tx(oopResult.fyt, 0)}\\,\\mathrm{MPa}`} />
+      </CalculationSubsection>
 
-   <CalculationSubsection title="7.2 Fire Moment & Capacity · 火灾弯矩与承载力">
-     <CalculationFormula caption="Fire moment Mbf / 火灾弯矩 (Support: Fire option)"
-       formula={`M_{bf} = \\frac{w_f(H_w-t_f)^2}{2}\\,k_{fire} = ${tx(oopResult.Mbf)}\\,\\mathrm{kN\\cdot m/m}`} />
-     <CalculationFormula caption="Fire utilisation UR3 / 火灾利用率" highlight
-       formula={`UR_3 = \\frac{M_{bf}}{\\phi M_{n,fire}} = ${txPct(oopResult.UR3)}\\%`}
-       status={mkStatus(Number.isFinite(oopResult.UR3) && oopResult.UR3 <= 1, 'PASS', 'CHECK')} />
-   </CalculationSubsection>
-
- </CalculationSection>
-);
+      <CalculationSubsection title="7.2 Fire Moment & Capacity · 火灾弯矩与承载力">
+        <CalculationFormula caption="Fire moment Mbf / 火灾弯矩 (Support: Fire option)"
+          formula={`M_{bf} = \\frac{w_f(H_w-t_f)^2}{2}\\,k_{fire} = ${tx(oopResult.Mbf)}\\,\\mathrm{kN\\cdot m/m}`} />
+        <CalculationFormula caption="Fire utilisation UR3 / 火灾利用率" highlight
+          formula={`UR_3 = \\frac{M_{bf}}{\\phi M_{n,fire}} = ${txPct(oopResult.UR3)}\\%`}
+          status={mkStatus(Number.isFinite(oopResult.UR3) && oopResult.UR3 <= 1, 'PASS', 'CHECK')} />
+      </CalculationSubsection>
+    </CalculationSection>
+  );
 }
 
 /* ---------------------------------------------------------------------------
-8. Wall Stability Check（墙体稳定计算）
+   8. Wall Stability Check
 --------------------------------------------------------------------------- */
 function StabilityBlock({ inputs, inPlane }) {
   const gravity = inPlane.gravity || {};
@@ -1468,36 +1033,12 @@ function StabilityBlock({ inputs, inPlane }) {
   const diaphragm = inPlane.diaphragm || {};
   const re = inPlane.reinforcement || {};
 
-  /*
-  BRANZ Guide – Slender precast concrete panels with low axial load
-  8.4 Wall panel design for stability
-
-  Four stability checks are required:
-    1) H/t ≤ 75
-    2) kH/t ≤ 65
-    3) stability under axial load – “Euler buckling” method
-    4) stability under lateral torsional buckling (Vlasov/Timoshenko)
-
-  The BRANZ Guide does not use the previous 0.1 f'c Ag axial-load limit,
-  generic P-Delta limit, or N-M interaction as the Section 8.4 stability
-  criteria. They are therefore not used here.
-  */
-
   const H = safe(inputs.wallHeight);
   const L = safe(inputs.wallWidth);
   const t = safe(inputs.wallThickness);
   const fc = safe(inputs.fc);
   const fy = safe(inputs.fy);
 
-  /*
-  The k factor is selected from BRANZ Guide Table 5.
-  Pinned–Pinned = 1.0
-  Fixed–Pinned  = 1.0 (conservative value within the Guide range)
-  Fixed–Free   = 1.4 (top restraint = Nil)
-
-  Fixed–Fixed is not explicitly listed in Table 5. It is conservatively
-  treated as k = 1.0 rather than assuming a smaller effective height.
-  */
   const support = inputs.supportWindSeismic || 'Pinned-Pinned';
   const kBySupport = {
     'Pinned-Pinned': 1.0,
@@ -1507,10 +1048,6 @@ function StabilityBlock({ inputs, inPlane }) {
   };
   const k = kBySupport[support] ?? 1.0;
 
-  /*
-  Wall geometry used directly by Section 8.4.
-  H/t ≤ 75 is based on the actual wall height, not hroof.
-  */
   const H_over_t = t > 0 ? H / t : Infinity;
   const kH_over_t = t > 0 ? k * H / t : Infinity;
   const HtLimit = 75;
@@ -1518,142 +1055,62 @@ function StabilityBlock({ inputs, inPlane }) {
   const HtPass = Number.isFinite(H_over_t) && H_over_t <= HtLimit + 1e-9;
   const kHtPass = Number.isFinite(kH_over_t) && kH_over_t <= kHtLimit + 1e-9;
 
-  /*
-  Gross cross-sectional area of the whole panel.
-  P, W and Ag must be on a consistent whole-panel basis in Equations 1 and 2.
-  */
-  const Ag = L > 0 && t > 0 ? L * 1000 * t * 1000 : 0; // mm²
+  const Ag = L > 0 && t > 0 ? L * 1000 * t * 1000 : 0;
 
-  /*
-  BRANZ P = gravity load from the roof on the wall.
-  The current calculation engine provides this as GlineTotal (kN).
-  W = self-weight of the wall panel (kN).
-  */
-  const P = safe(gravity.GlineTotal,
-    safe(inputs.gUniform) * safe(inputs.Sr, 1) * L);
-  const W = safe(gravity.Gwall,
-    safe(inputs.concreteDensity) * t * H * L);
+  const P = safe(gravity.GlineTotal, safe(inputs.gUniform) * safe(inputs.Sr, 1) * L);
+  const W = safe(gravity.Gwall, safe(inputs.concreteDensity) * t * H * L);
 
-  /*
-  Vertical reinforcement ratio ρt used by the BRANZ stability equations.
-  */
   const rhoT = Number.isFinite(Number(re.rhoVertical))
     ? Math.max(Number(re.rhoVertical), 0)
     : (() => {
-        const sv = safe(inputs.VbarSpace);
-        const dv = safe(inputs.VbarDia);
-        const nV = sv > 0 && L > 0 ? Math.floor((L * 1000) / sv) + 1 : 0;
-        const AsV = nV * Math.PI * dv ** 2 / 4;
-        return Ag > 0 ? AsV / Ag : 0;
-      })();
+      const sv = safe(inputs.VbarSpace);
+      const dv = safe(inputs.VbarDia);
+      const nV = sv > 0 && L > 0 ? Math.floor((L * 1000) / sv) + 1 : 0;
+      const AsV = nV * Math.PI * dv ** 2 / 4;
+      return Ag > 0 ? AsV / Ag : 0;
+    })();
 
-  /*
-  Equation 1 — Euler buckling stability.
-
-    kH/t ≤ 15 / [ (P + 0.5W)/(f'c Ag) + 0.4ρt fy/f'c ]
-
-  The dimensionless load term is also the ordinate used in Figure 12.
-  */
-  const axialLoadTerm = fc > 0 && Ag > 0
-    ? (P + 0.5 * W) * 1000 / (fc * Ag)
-    : Infinity;
-  const steelEulerTerm = fc > 0
-    ? 0.4 * rhoT * fy / fc
-    : Infinity;
+  const axialLoadTerm = fc > 0 && Ag > 0 ? (P + 0.5 * W) * 1000 / (fc * Ag) : Infinity;
+  const steelEulerTerm = fc > 0 ? 0.4 * rhoT * fy / fc : Infinity;
   const eulerLoadTerm = axialLoadTerm + steelEulerTerm;
-  const eulerLimit = Number.isFinite(eulerLoadTerm) && eulerLoadTerm > 0
-    ? 15 / eulerLoadTerm
-    : Infinity;
+  const eulerLimit = Number.isFinite(eulerLoadTerm) && eulerLoadTerm > 0 ? 15 / eulerLoadTerm : Infinity;
   const eulerPass = Number.isFinite(kH_over_t) && kH_over_t <= eulerLimit + 1e-9;
 
-  /*
-  Me* is the design base moment corresponding to μ = 1.0.
-  The existing in-plane seismic result is based on the selected design
-  ductility. Scale the seismic moment back to the elastic (μ = 1) action
-  using Cd(μ=1) / Cd(current). Roof diaphragm seismic moment is included
-  because it is an in-plane seismic action at the wall top.
-  */
   const CdCurrent = safe(seismic.Cd);
   const CdElastic = safe(seismic.CT1);
-  const elasticScale = CdCurrent > 0 && CdElastic > 0
-    ? CdElastic / CdCurrent
-    : 1;
+  const elasticScale = CdCurrent > 0 && CdElastic > 0 ? CdElastic / CdCurrent : 1;
   const MseismicCurrent = safe(seismic.Mseismic);
   const MdiaphragmSeismicCurrent = safe(diaphragm.MdiaphragmSeismic);
-  const MeStar = Math.abs(
-    (MseismicCurrent + MdiaphragmSeismicCurrent) * elasticScale
-  );
+  const MeStar = Math.abs((MseismicCurrent + MdiaphragmSeismicCurrent) * elasticScale);
 
-  /*
-  Equation 2 — Vlasov/Timoshenko lateral torsional buckling.
-
-    (kH/t)(H/L)^0.5 ≤ 12 / λ
-
-  Check both BRANZ cases:
-    (a) λ = ρt fy/f'c + (P + 0.5W)/(f'c Ag)
-    (b) λ = 2.2 Me* /(L f'c Ag)
-
-  The Guide states that both case points must be on the acceptable side.
-  */
-  const ltbGeometry = L > 0 && H > 0 && Number.isFinite(kH_over_t)
-    ? kH_over_t * Math.sqrt(H / L)
-    : Infinity;
-
-  const ltbLoadA = fc > 0 && Ag > 0
-    ? rhoT * fy / fc + (P + 0.5 * W) * 1000 / (fc * Ag)
-    : Infinity;
-  const ltbLoadB = fc > 0 && Ag > 0 && L > 0
-    ? 2.2 * MeStar * 1e6 / (L * fc * Ag)
-    : Infinity;
-
+  const ltbGeometry = L > 0 && H > 0 && Number.isFinite(kH_over_t) ? kH_over_t * Math.sqrt(H / L) : Infinity;
+  const ltbLoadA = fc > 0 && Ag > 0 ? rhoT * fy / fc + (P + 0.5 * W) * 1000 / (fc * Ag) : Infinity;
+  const ltbLoadB = fc > 0 && Ag > 0 && L > 0 ? 2.2 * MeStar * 1e6 / (L * fc * Ag) : Infinity;
   const ltbProductA = ltbGeometry * ltbLoadA;
   const ltbProductB = ltbGeometry * ltbLoadB;
   const ltbPassA = Number.isFinite(ltbProductA) && ltbProductA <= 12 + 1e-9;
   const ltbPassB = Number.isFinite(ltbProductB) && ltbProductB <= 12 + 1e-9;
   const ltbPass = ltbPassA && ltbPassB;
-
   const overallOK = HtPass && kHtPass && eulerPass && ltbPass;
 
   const stabilityRows = [
-    [
-      '8.4.1 H/t ≤ 75',
-      `H/t = ${tx(H_over_t)} ≤ ${tx(HtLimit, 0)}`,
-      HtPass
-    ],
-    [
-      '8.4.2 kH/t ≤ 65',
-      `k = ${tx(k, 2)}, kH/t = ${tx(kH_over_t)} ≤ ${tx(kHtLimit, 0)}`,
-      kHtPass
-    ],
-    [
-      '8.4.3 Euler buckling stability',
-      `kH/t = ${tx(kH_over_t)} ≤ ${tx(eulerLimit, 2)}`,
-      eulerPass
-    ],
-    [
-      '8.4.4 Lateral torsional buckling',
-      `Case (a): ${tx(ltbProductA, 3)} ≤ 12; Case (b): ${tx(ltbProductB, 3)} ≤ 12`,
-      ltbPass
-    ]
+    ['8.4.1 H/t ≤ 75', `H/t = ${tx(H_over_t)} ≤ ${tx(HtLimit, 0)}`, HtPass],
+    ['8.4.2 kH/t ≤ 65', `k = ${tx(k, 2)}, kH/t = ${tx(kH_over_t)} ≤ ${tx(kHtLimit, 0)}`, kHtPass],
+    ['8.4.3 Euler buckling stability', `kH/t = ${tx(kH_over_t)} ≤ ${tx(eulerLimit, 2)}`, eulerPass],
+    ['8.4.4 Lateral torsional buckling', `Case (a): ${tx(ltbProductA, 3)} ≤ 12; Case (b): ${tx(ltbProductB, 3)} ≤ 12`, ltbPass]
   ];
 
   return (
-    <CalculationSection number="8" title="Wall Stability Check · 稳定计算" chip={<Chip size="small" label="BRANZ Guide §8.4" />}
-    >
+    <CalculationSection number="8" title="Wall Stability Check · 稳定计算" chip={<Chip size="small" label="BRANZ Guide §8.4" />}>
       <Alert severity={overallOK ? 'success' : 'warning'} sx={{ mb: 2 }}>
-        BRANZ §8.4 wall panel stability checks: H/t limit, effective-height
-        slenderness kH/t, Euler buckling stability and Vlasov/Timoshenko lateral
-        torsional buckling. （BRANZ §8.4 墙板稳定验算：H/t 限值、有效高度长细比
-        kH/t、Euler 屈曲稳定以及 Vlasov/Timoshenko 侧向扭转屈曲。）
+        BRANZ §8.4 wall panel stability checks: H/t limit, effective-height slenderness kH/t, Euler buckling stability and Vlasov/Timoshenko lateral torsional buckling.
       </Alert>
-
       <Box sx={{ overflowX: 'auto', mb: 2 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr>
               {['Stability check', 'Result', 'Status'].map((hd) => (
-                <th key={hd} style={{textAlign: hd === 'Stability check' ? 'left' : 'right',
-                    padding: '6px 10px', borderBottom: '2px solid #e5e7eb', fontWeight: 800}}>
+                <th key={hd} style={{ textAlign: hd === 'Stability check' ? 'left' : 'right', padding: '6px 10px', borderBottom: '2px solid #e5e7eb', fontWeight: 800 }}>
                   {hd}
                 </th>
               ))}
@@ -1662,13 +1119,9 @@ function StabilityBlock({ inputs, inPlane }) {
           <tbody>
             {stabilityRows.map(([label, value, pass]) => (
               <tr key={label}>
-                <td style={{padding: '6px 10px', borderBottom: '1px solid #eee', fontWeight: 600}}>
-                  {label}
-                </td>
-                <td style={{textAlign: 'right', padding: '6px 10px', borderBottom: '1px solid #eee', fontVariantNumeric: 'tabular-nums'}}>
-                  {value}
-                </td>
-                <td style={{ textAlign: 'right', padding: '6px 10px', borderBottom: '1px solid #eee'}}>
+                <td style={{ padding: '6px 10px', borderBottom: '1px solid #eee', fontWeight: 600 }}>{label}</td>
+                <td style={{ textAlign: 'right', padding: '6px 10px', borderBottom: '1px solid #eee', fontVariantNumeric: 'tabular-nums' }}>{value}</td>
+                <td style={{ textAlign: 'right', padding: '6px 10px', borderBottom: '1px solid #eee' }}>
                   <Chip size="small" label={pass ? 'PASS' : 'CHECK'} color={pass ? 'success' : 'warning'} sx={{ fontWeight: 700 }} />
                 </td>
               </tr>
@@ -1676,64 +1129,38 @@ function StabilityBlock({ inputs, inPlane }) {
           </tbody>
         </table>
       </Box>
-
+      
       <CalculationSubsection title="8.4.1 H/t limit · 高厚比限值">
-        <CalculationFormula caption="Wall height / 墙高"
-          formula={`H = ${tx(H)}\\,\\mathrm{m},\\qquad t = ${tx(t)}\\,\\mathrm{m}`}
-        />
-        <CalculationFormula caption="H/t ≤ 75"
-          formula={`\\frac{H}{t} = \\frac{${tx(H)}}{${tx(t)}} = ${tx(H_over_t)} \\le 75`}
-          status={mkStatus(HtPass, 'PASS', 'CHECK')}
-        />
+        <CalculationFormula caption="Wall height / 墙高" formula={`H = ${tx(H)}\\,\\mathrm{m},\\qquad t = ${tx(t)}\\,\\mathrm{m}`} />
+        <CalculationFormula caption="H/t ≤ 75" formula={`\\frac{H}{t} = \\frac{${tx(H)}}{${tx(t)}} = ${tx(H_over_t)} \\le 75`} status={mkStatus(HtPass, 'PASS', 'CHECK')} />
       </CalculationSubsection>
 
       <CalculationSubsection title="8.4.2 Effective height coefficient k · 有效高度系数 k">
-        <CalculationFormula caption="Support condition / 支承条件"
-          formula={`\\text{Support} = ${support},\\qquad k = ${tx(k, 2)}`}
-        />
-        <CalculationFormula caption="Effective slenderness kH/t / 有效长细比"
-          formula={`\\frac{kH}{t} = ${tx(k, 2)}\\times\\frac{${tx(H)}}{${tx(t)}} = ${tx(kH_over_t)} \\le 65`}
-          status={mkStatus(kHtPass, 'PASS', 'CHECK')}/>
+        <CalculationFormula caption="Support condition / 支承条件" formula={`\\text{Support} = ${support},\\qquad k = ${tx(k, 2)}`} />
+        <CalculationFormula caption="Effective slenderness kH/t / 有效长细比" formula={`\\frac{kH}{t} = ${tx(k, 2)}\\times\\frac{${tx(H)}}{${tx(t)}} = ${tx(kH_over_t)} \\le 65`} status={mkStatus(kHtPass, 'PASS', 'CHECK')} />
       </CalculationSubsection>
 
       <CalculationSubsection title="8.4.3 Euler buckling stability · Euler 屈曲稳定">
-        <CalculationFormula caption="Gross wall area / 墙体毛截面面积"
-          formula={`A_g = (${tx(L)}\\times1000)(${tx(t)}\\times1000) = ${tx(Ag, 0)}\\,\\mathrm{mm^2}`} />
-        <CalculationFormula caption="Roof gravity load P / 屋面重力荷载 P"
-          formula={`P = ${tx(P)}\\,\\mathrm{kN}`}
-        />
-        <CalculationFormula caption="Wall self-weight W / 墙体自重 W"
-          formula={`W = ${tx(W)}\\,\\mathrm{kN}`}        />
-        <CalculationFormula caption="Euler load parameter / Euler 荷载参数"
-          formula={`\\Lambda_E = \\frac{P+0.5W}{f'_cA_g} + 0.4\\rho_t\\frac{f_y}{f'_c} = ${tx(eulerLoadTerm, 4)}`} />
-        <CalculationFormula caption="Euler stability inequality / Euler 稳定不等式"
-          formula={`\\frac{kH}{t} \\le \\frac{15}{\\Lambda_E} = \\frac{15}{${tx(eulerLoadTerm, 4)}} = ${tx(eulerLimit, 2)}`}
-          status={mkStatus(eulerPass, 'PASS', 'CHECK')} />
+        <CalculationFormula caption="Gross wall area / 墙体毛截面面积" formula={`A_g = (${tx(L)}\\times1000)(${tx(t)}\\times1000) = ${tx(Ag, 0)}\\,\\mathrm{mm^2}`} />
+        <CalculationFormula caption="Roof gravity load P / 屋面重力荷载 P" formula={`P = ${tx(P)}\\,\\mathrm{kN}`} />
+        <CalculationFormula caption="Wall self-weight W / 墙体自重 W" formula={`W = ${tx(W)}\\,\\mathrm{kN}`} />
+        <CalculationFormula caption="Euler load parameter / Euler 荷载参数" formula={`\\Lambda_E = \\frac{P+0.5W}{f'_cA_g} + 0.4\\rho_t\\frac{f_y}{f'_c} = ${tx(eulerLoadTerm, 4)}`} />
+        <CalculationFormula caption="Euler stability inequality / Euler 稳定不等式" formula={`\\frac{kH}{t} \\le \\frac{15}{\\Lambda_E} = \\frac{15}{${tx(eulerLoadTerm, 4)}} = ${tx(eulerLimit, 2)}`} status={mkStatus(eulerPass, 'PASS', 'CHECK')} />
       </CalculationSubsection>
 
       <CalculationSubsection title="8.4.4 Lateral torsional buckling · 侧向扭转屈曲">
-        <CalculationFormula caption="Geometry term / 几何项"
-          formula={`X = \\frac{kH}{t}\\left(\\frac{H}{L}\\right)^{1/2} = ${tx(kH_over_t)}\\left(\\frac{${tx(H)}}{${tx(L)}}\\right)^{1/2} = ${tx(ltbGeometry, 3)}`} />
-        <CalculationFormula
-          caption="Case (a) load parameter / 情况 (a) 荷载参数"
-          formula={`\\lambda_a = \\rho_t\\frac{f_y}{f'_c}+\\frac{P+0.5W}{f'_cA_g} = ${tx(ltbLoadA, 4)},\\qquad X\\lambda_a = ${tx(ltbProductA, 3)} \\le 12`}
-          status={mkStatus(ltbPassA, 'PASS', 'CHECK')} />
-        <CalculationFormula caption="Case (b) elastic moment parameter / 情况 (b) 弹性弯矩参数"
-          formula={`M_e^* = ${tx(MeStar)}\\,\\mathrm{kN\\cdot m},\\qquad \\lambda_b = \\frac{2.2M_e^*}{Lf'_cA_g} = ${tx(ltbLoadB, 4)},\\qquad X\\lambda_b = ${tx(ltbProductB, 3)} \\le 12`}
-          status={mkStatus(ltbPassB, 'PASS', 'CHECK')} />
-        <CalculationFormula caption="Overall lateral torsional stability / 总体侧向扭转稳定"
-          highlight
-          formula={`\\text{Case (a)}\\;X\\lambda_a = ${tx(ltbProductA, 3)}\\le12,\\qquad \\text{Case (b)}\\;X\\lambda_b = ${tx(ltbProductB, 3)}\\le12`}
-          status={mkStatus(ltbPass, 'PASS', 'CHECK')} />
-        <CalculationFormula caption="Overall stability result / 总体稳定结果" highlight
-          formula={`\\text{Overall stability} = ${overallOK ? 'PASS' : 'CHECK'}`}
-          status={mkStatus(overallOK, 'PASS', 'CHECK')} />
+        <CalculationFormula caption="Geometry term / 几何项" formula={`X = \\frac{kH}{t}\\left(\\frac{H}{L}\\right)^{1/2} = ${tx(kH_over_t)}\\left(\\frac{${tx(H)}}{${tx(L)}}\\right)^{1/2} = ${tx(ltbGeometry, 3)}`} />
+        <CalculationFormula caption="Case (a) load parameter / 情况 (a) 荷载参数" formula={`\\lambda_a = \\rho_t\\frac{f_y}{f'_c}+\\frac{P+0.5W}{f'_cA_g} = ${tx(ltbLoadA, 4)},\\qquad X\\lambda_a = ${tx(ltbProductA, 3)} \\le 12`} status={mkStatus(ltbPassA, 'PASS', 'CHECK')} />
+        <CalculationFormula caption="Case (b) elastic moment parameter / 情况 (b) 弹性弯矩参数" formula={`M_e^* = ${tx(MeStar)}\\,\\mathrm{kN\\cdot m},\\qquad \\lambda_b = \\frac{2.2M_e^*}{Lf'_cA_g} = ${tx(ltbLoadB, 4)},\\qquad X\\lambda_b = ${tx(ltbProductB, 3)} \\le 12`} status={mkStatus(ltbPassB, 'PASS', 'CHECK')} />
+        <CalculationFormula caption="Overall lateral torsional stability / 总体侧向扭转稳定" highlight formula={`\\text{Case (a)}\\;X\\lambda_a = ${tx(ltbProductA, 3)}\\le12,\\qquad \\text{Case (b)}\\;X\\lambda_b = ${tx(ltbProductB, 3)}\\le12`} status={mkStatus(ltbPass, 'PASS', 'CHECK')} />
+        <CalculationFormula caption="Overall stability result / 总体稳定结果" highlight formula={`\\text{Overall stability} = ${overallOK ? 'PASS' : 'CHECK'}`} status={mkStatus(overallOK, 'PASS', 'CHECK')} />
       </CalculationSubsection>
     </CalculationSection>
   );
 }
+
 /* ---------------------------------------------------------------------------
-   9. Lintel Boundary Element Check（过梁承压和边缘构件计算）
+   9. Lintel Boundary Element Check
 --------------------------------------------------------------------------- */
 function LintelBoundaryElementBlock({ inputs, inPlane, outOfPlane }) {
   const be = inPlane.bearing || {};
@@ -1741,9 +1168,8 @@ function LintelBoundaryElementBlock({ inputs, inPlane, outOfPlane }) {
   const it = inPlane.interaction || {};
   const sh = inPlane.shear || {};
   const ch = inPlane.checks || {};
-
   const minBlock = Math.min(safe(re.d), safe(inputs.boundaryWidth) * 1000);
-  /* v0.6.2 —— 边缘构件局部 N-M 数据 */
+
   const bn = inPlane.boundaryNM || {};
   const bns = bn.section || {};
   const bnk = bn.keyPoints || {};
@@ -1753,10 +1179,10 @@ function LintelBoundaryElementBlock({ inputs, inPlane, outOfPlane }) {
   const bngov = bn.governing || {};
 
   return (
-    <CalculationSection number="9" title="Lintel Bearing & Boundary Element · 过梁和边缘构件计算" chip={<Chip size="small" label="Lintel Bearing / Boundary Element " />}>
+    <CalculationSection number="9" title="Lintel Bearing & Boundary Element · 过梁和边缘构件计算" chip={<Chip size="small" label="Lintel Bearing / Boundary Element" />}>
       <CalculationSubsection title="5.4 Lintel bearing (D-region) · 过梁局部承压">
         <CalculationFormula caption="Bearing area / 承压面积"
-          formula={`A_b = b_b\\times l_b = \\frac{${tx(inputs.bearingWidth,0)}}{1000}\\times\\frac{${tx(inputs.bearingLength,0)}}{1000} = ${tx(safe(inputs.bearingWidth) * safe(inputs.bearingLength) / 1e6, 4)}\\,\\mathrm{m^2} = ${tx(safe(inputs.bearingWidth) * safe(inputs.bearingLength), 0)}\\,\\mathrm{mm^2}`} />
+          formula={`A_b = b_b\\times l_b = \\frac{${tx(inputs.bearingWidth, 0)}}{1000}\\times\\frac{${tx(inputs.bearingLength, 0)}}{1000} = ${tx(safe(inputs.bearingWidth) * safe(inputs.bearingLength) / 1e6, 4)}\\,\\mathrm{m^2} = ${tx(safe(inputs.bearingWidth) * safe(inputs.bearingLength), 0)}\\,\\mathrm{mm^2}`} />
         <CalculationFormula caption="Bearing stress / 承压应力"
           formula={`\\sigma_b = \\frac{R_{lintel}}{A_b} = \\frac{${tx(inputs.lintelReaction)}\\times1000}{${tx(safe(inputs.bearingWidth) * safe(inputs.bearingLength), 0)}} = ${tx(be.bearingStress, 4)}\\,\\mathrm{MPa}`} />
         <CalculationFormula caption="Bearing capacity / 承压承载力限值"
@@ -1766,15 +1192,10 @@ function LintelBoundaryElementBlock({ inputs, inPlane, outOfPlane }) {
           status={mkStatus(ch.bearingPass, 'PASS', 'CHECK')} />
       </CalculationSubsection>
 
-      {/* ------------------------------------------------------------------
-          v0.6.2 新增 —— 4.7 边缘构件局部压弯 N-M（Lintel 反力作用于墙边）
-          完整平截面 N-M 承载力曲线 + ϕ(N) 设计包络 + 需求包络图（SVG）
-      ------------------------------------------------------------------ */}
       <CalculationSubsection title="5.5 Boundary element local N-M (lintel at wall edge) · 边缘构件局部压弯 N-M（v0.6.2 新增）">
         {bn.available === false ? (
           <Alert severity="info">
             Boundary element local N-M check skipped (no boundary element or incomplete data).
-            （无边缘构件或参数缺失，跳过本项局部压弯验算。）
           </Alert>
         ) : (
           <>
@@ -1790,7 +1211,7 @@ function LintelBoundaryElementBlock({ inputs, inPlane, outOfPlane }) {
               formula={`\\phi M_0 = ${tx(bnk.phiM0, 1)}\\,\\mathrm{kN\\cdot m}`} />
             <CalculationFormula caption="Gravity share of boundary element / 边缘构件分担重力（按面积占比 r = A_b / A_g）"
               formula={`r = ${tx(bng.r, 4)},\\qquad G_b = r(G_{wall}+G_{line,total}) = ${tx(bng.Gb, 1)}\\,\\mathrm{kN},\\qquad Q_b = r\\,Q_{line,total} = ${tx(bng.Qb, 1)}\\,\\mathrm{kN}`} />
-            {/* 需求包络表（三种组合，含 Lintel 偏心弯矩 R·e） */}
+            
             <Box sx={{ overflowX: 'auto', mb: 1.5 }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
@@ -1827,7 +1248,6 @@ function LintelBoundaryElementBlock({ inputs, inPlane, outOfPlane }) {
             <CalculationFormula caption="Governing N-M utilisation / 控制利用率（等轴力水平内插：UR = M* / φMn(N*)）" highlight
               formula={`UR_{b,N-M} = \\frac{M^*}{\\phi M_n(N^*)} = \\frac{${tx(bngov.M, 2)}}{${tx(bngov.Mcap, 2)}} = ${txUR(bnc.governingUR)} = ${txPct(bnc.governingUR)}\\%`}
               status={mkStatus(bnc.pass, 'PASS', 'CHECK')} />
-            {/* v0.6.2 —— N-M 承载力曲线与需求包络图（SVG） */}
             <NMInteractionChart boundary={bn} />
           </>
         )}
@@ -1835,8 +1255,9 @@ function LintelBoundaryElementBlock({ inputs, inPlane, outOfPlane }) {
     </CalculationSection>
   );
 }
+
 /* ---------------------------------------------------------------------------
-   10. Base Connection Design（连接计算）
+   10. Base Connection Design
 --------------------------------------------------------------------------- */
 function BaseConnectionBlock({ inputs, connection }) {
   const resConnection = connection || {};
@@ -1847,6 +1268,7 @@ function BaseConnectionBlock({ inputs, connection }) {
   const be = resConnection.bearing || {};
   const rt = resConnection.ratios || {};
   const ch = resConnection.checks || {};
+
   return (
     <CalculationSection number="8" title="Base Connection Design · 连接计算" chip={<Chip size="small" label="Dowel / Grouted Connection" />}>
       <CalculationSubsection title="8.1 Shear demand · 剪力需求">
@@ -1855,6 +1277,7 @@ function BaseConnectionBlock({ inputs, connection }) {
         <CalculationFormula caption="Connection shear demand / 连接剪力需求" highlight
           formula={`V^*_{conn} = \\max(V^*_{in},\\,V_{oop,total}) = \\max(${tx(dm.VinPlane)},\\,${tx(dm.VoutTotal)}) = ${tx(dm.Vstar)}\\,\\mathrm{kN}`} />
       </CalculationSubsection>
+
       <CalculationSubsection title="8.2 Dowel shear capacity · 锚筋抗剪">
         <CalculationFormula caption="Area of one dowel / 单根锚筋面积"
           formula={`A_d = \\frac{\\pi\\phi_d^2}{4} = \\frac{\\pi(${tx(dw.dDowel, 0)})^2}{4} = ${tx(dw.Ad, 1)}\\,\\mathrm{mm^2}`} />
@@ -1865,6 +1288,7 @@ function BaseConnectionBlock({ inputs, connection }) {
         <CalculationFormula caption="Governing dowel shear / 锚筋抗剪取小" highlight
           formula={`V_{dowel} = \\min(V_{steel},V_{bond}) = ${tx(dw.Vdowel)}\\,\\mathrm{kN}`} />
       </CalculationSubsection>
+
       <CalculationSubsection title="8.3 Shear friction & shear key · 剪切摩擦与剪力键">
         <CalculationFormula caption="Shear friction / 剪切摩擦"
           formula={`V_{fric} = \\mu N^* = (${tx(fr.muFriction)})(${tx(dm.Nstar)}) = ${tx(fr.Vfriction)}\\,\\mathrm{kN}`} />
@@ -1876,6 +1300,7 @@ function BaseConnectionBlock({ inputs, connection }) {
           formula={`UR_{V,conn} = \\frac{V^*_{conn}}{\\phi V_{conn}} = \\frac{${tx(dm.Vstar)}}{${tx(cap.phiVconn)}} = ${txUR(rt.shearRatio)} = ${txPct(rt.shearRatio)}\\%`}
           status={mkStatus(ch.shearPass, 'PASS', 'CHECK')} />
       </CalculationSubsection>
+
       <CalculationSubsection title="8.4 Uplift & grout bed bearing · 抗拔与灌浆垫承压">
         <CalculationFormula caption="Dowel tension capacity / 锚筋抗拔承载力"
           formula={`\\phi T_{conn} = \\phi_c\\,nA_df_y/1000 = (${tx(resConnection.phiConn)})(${tx(dw.nDowel, 0)})(${tx(dw.Ad, 1)})(${tx(inputs.fy)})/1000 = ${tx(cap.phiTconn)}\\,\\mathrm{kN}`} />
@@ -1891,7 +1316,7 @@ function BaseConnectionBlock({ inputs, connection }) {
 }
 
 /* ---------------------------------------------------------------------------
-   11. Foundation Design（基础计算）
+   11. Foundation Design
 --------------------------------------------------------------------------- */
 function FoundationBlock({ inputs, inPlane, outOfPlane, foundation }) {
   const resOOP = outOfPlane || {};
@@ -1900,6 +1325,7 @@ function FoundationBlock({ inputs, inPlane, outOfPlane, foundation }) {
   const hv = resOOP.hroofValidation || {};
   const Mstar = safe(inPlane?.sectionActions?.Mtotal);
   const Vstar = safe(inPlane?.sectionActions?.Vtotal);
+
   return (
     <CalculationSection number="9" title="Foundation Design · 基础计算" chip={<Chip size="small" label="OOP UR5/UR6 + In-Plane Footing" />}>
       <CalculationSubsection title="9.1 OOP foundation (UR5 bearing / UR6 footing flexure) · 平面外基础">
@@ -1916,6 +1342,7 @@ function FoundationBlock({ inputs, inPlane, outOfPlane, foundation }) {
           formula={`UR_6 = \\frac{M_O}{\\phi M_{n,foot}} = \\frac{${tx(resOOP.Mo)}}{${tx(resOOP.phiMn_foot)}} = ${txUR(resOOP.UR6)} = ${txPct(resOOP.UR6)}\\%`}
           status={mkStatus(Number.isFinite(resOOP.UR6) && resOOP.UR6 <= 1, 'PASS', 'CHECK')} />
       </CalculationSubsection>
+
       <CalculationSubsection title="9.2 In-plane footing checks · 平面内基础（条形基础简化验算）">
         <CalculationFormula caption="Footing self-weight / 基础自重"
           formula={`G_{foot} = \\gamma_c B L t_{foot} = (${tx(inputs.concreteDensity)})(${tx(resFoundation.B)})(${tx(resFoundation.L)})(${tx(resFoundation.tf)}) = ${tx(resFoundation.Gfooting)}\\,\\mathrm{kN}`} />
@@ -1938,18 +1365,18 @@ function FoundationBlock({ inputs, inPlane, outOfPlane, foundation }) {
 }
 
 /* ---------------------------------------------------------------------------
-   12. Utilisation Summary（利用率汇总）
+   12. Utilisation Summary
 --------------------------------------------------------------------------- */
 function UtilisationSummaryBlock({ inPlane, outOfPlane, connection, foundation }) {
   const ip = inPlane || {};
   const op = outOfPlane || {};
   const cn = connection || {};
   const fd = foundation || {};
+
   const rows = [
     ["In-plane: Compression stress σmax ≤ 0.6f'c (平面内：受压应力)", null, ip.checks?.stressCompressionPass],
     ['In-plane: Lintel bearing UR (平面内：过梁承压)', ip.bearing?.bearingRatio, ip.checks?.bearingPass],
     ['In-plane: N-M interaction UR (平面内：N-M 交互)', ip.interaction?.interactionRatio, ip.checks?.interactionPass],
-    /* v0.6.2 —— 边缘构件局部压弯 N-M（Lintel 作用于墙边） */
     ['In-plane: Boundary element local N-M UR (边缘构件局部压弯)', ip.boundaryNM?.checks?.governingUR ?? null, ip.checks?.boundaryNMPass],
     ['In-plane: Shear UR (平面内：抗剪)', ip.shear?.shearRatio, ip.checks?.shearPass],
     ['In-plane: Tension / boundary steel (平面内：受拉/边缘钢筋)', null, ip.checks?.tensionPass],
@@ -1966,6 +1393,7 @@ function UtilisationSummaryBlock({ inPlane, outOfPlane, connection, foundation }
     ['In-plane footing: Sliding UR (平面内基础：抗滑移)', fd.slidingRatio, fd.checks?.slidingPass],
     ['OOP slenderness h/t (warning item) (平面外长细比，警告项)', null, !(ip.checks?.slendernessWarning)]
   ];
+
   return (
     <CalculationSection number="10" title="Utilisation Summary · 利用率汇总" chip={<Chip size="small" label="UR ≤ 1.00" />}>
       <TableContainer component={Paper} variant="outlined">
@@ -2003,7 +1431,7 @@ function UtilisationSummaryBlock({ inPlane, outOfPlane, connection, foundation }
 }
 
 /* ---------------------------------------------------------------------------
-   CALCULATION TAB main component 三大页面的第二 CalculationTab的总组件，调用上述分组件
+   CALCULATION TAB main component
 --------------------------------------------------------------------------- */
 function CalculationTab({ inputs, results }) {
   const ResultInPlane = results.inPlane || {};
@@ -2011,6 +1439,7 @@ function CalculationTab({ inputs, results }) {
   const ResultConnection = results.connection || {};
   const ResultFoundation = results.foundation || {};
   const ResultSummary = results.summary || {};
+
   return (
     <Box>
       <Alert severity={ResultSummary.overallPass ? 'success' : 'warning'} sx={{ mb: 2, fontWeight: 700 }}>
@@ -2018,36 +1447,34 @@ function CalculationTab({ inputs, results }) {
           ? '✓ All implemented checks pass under current inputs. (当前输入下全部检查通过。)'
           : '✗ Some checks did not pass. Review the sections and status labels below. (存在未通过的检查项，请查看下方各分段。)'}
       </Alert>
+
       <CalculationSection number="0" title="Input Data Used · 输入参数汇总" chip={<Chip size="small" label="Live inputs" />}>
         <InputSummaryTable inputs={inputs} />
       </CalculationSection>
+
       <GeoBlock inputs={inputs} ResinPlane={ResultInPlane} ResoutOfPlane={ResultOutOfPlane} />
       <LoadDerivationBlock inputs={inputs} ResinPlane={ResultInPlane} ResoutOfPlane={ResultOutOfPlane} />
-      <InPlaneSeismicBlock inputs={inputs} inPlane={ResultInPlane} ResoutOfPlane={ResultOutOfPlane}/>
+      <InPlaneSeismicBlock inputs={inputs} inPlane={ResultInPlane} ResoutOfPlane={ResultOutOfPlane} />
       <InPlaneActionsBlock inputs={inputs} inPlane={ResultInPlane} />
       <InPlaneChecksBlock inputs={inputs} inPlane={ResultInPlane} />
-      {/* <OutOfPlaneBlock inputs={inputs} outOfPlane={ResultOutOfPlane} /> */}
+      
       {/* 拆分后的平面外设计：风与地震 */}
       <OutOfPlaneWindSeismicBlock inputs={inputs} outOfPlane={ResultOutOfPlane} />
       {/* 拆分后的平面外设计：抗火 */}
       <OutOfPlaneFireBlock inputs={inputs} outOfPlane={ResultOutOfPlane} />
+      
       <StabilityBlock inputs={inputs} inPlane={ResultInPlane} outOfPlane={ResultOutOfPlane} />
       <LintelBoundaryElementBlock inputs={inputs} inPlane={ResultInPlane} outOfPlane={ResultOutOfPlane} />
       <BaseConnectionBlock inputs={inputs} connection={ResultConnection} />
       <FoundationBlock inputs={inputs} inPlane={ResultInPlane} outOfPlane={ResultOutOfPlane} foundation={ResultFoundation} />
       <UtilisationSummaryBlock inPlane={ResultInPlane} outOfPlane={ResultOutOfPlane} connection={ResultConnection} foundation={ResultFoundation} />
-      {/* <Alert severity="warning" sx={{ mt: 1 }}>
-        The formulas above reflect the actual calculation engine implementation. Final design must be
-        verified against NZS 3101, AS/NZS 1170 series and project-specific requirements by a qualified engineer.
-        （以上公式为计算引擎实际实现的公式。最终设计必须由合格工程师按规范及项目要求复核。）
-      </Alert> */}
     </Box>
   );
 }
 
 /* ============================================================================
-   RESULTS TAB 三大页面的第三
-========================================================================== */
+   RESULTS TAB
+============================================================================ */
 function ResultsTab({ inputs, results }) {
   const inPlane = results.inPlane || {};
   const outOfPlane = results.outOfPlane || {};
@@ -2056,8 +1483,8 @@ function ResultsTab({ inputs, results }) {
   const summary = results.summary || {};
   const pass = summary.overallPass;
   const sc = outOfPlane.supportConditions || {};
-  /* v0.6.2 —— 边缘构件局部 N-M 数据 */
   const bn = inPlane.boundaryNM || {};
+
   return (
     <Box>
       <Alert severity={pass ? 'success' : 'error'} sx={{ mb: 2, fontWeight: 700 }}>
@@ -2065,37 +1492,28 @@ function ResultsTab({ inputs, results }) {
           ? '✓ Current calculation result satisfies the implemented checks.'
           : '✗ Current calculation result requires review.'}
       </Alert>
+
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-        <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>
-          Structural Model Diagram
-        </Typography>
+        <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>Structural Model Diagram</Typography>
         <PrecastPanelSVG inputs={inputs} results={results} />
       </Paper>
-      {/* {summary.hroofWarning && (
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          hroof clamped to {fmt(outOfPlane.hroofValidation?.hroofEffective, 2)} m.
-        </Alert>
-      )} */}
+
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>In-Plane Design Summary</Typography>
         <ResultRow label="N (Compression)" value={fmt(inPlane.sectionActions?.NseismicCompression, 2)} unit="kN" />
-        <ResultRow label="V* (Shear)" value={fmt(inPlane.sectionActions?.Vtotal, 2)} unit="kN" pass={inPlane.checks?.shearPass} />
+        <ResultRow label="V (Shear)" value={fmt(inPlane.sectionActions?.Vtotal, 2)} unit="kN" pass={inPlane.checks?.shearPass} />
         <ResultRow label="M* (Moment)" value={fmt(inPlane.sectionActions?.Mtotal, 2)} unit="kN·m" />
         <ResultRow label="N-M Interaction Ratio" value={fmt(inPlane.interaction?.interactionRatio, 3)} unit="UR" pass={inPlane.checks?.interactionPass} highlight />
         <ResultRow label="Shear Ratio" value={fmt(inPlane.shear?.shearRatio, 3)} unit="UR" pass={inPlane.checks?.shearPass} />
         <ResultRow label="Bearing Ratio" value={fmt(inPlane.bearing?.bearingRatio, 3)} unit="UR" pass={inPlane.checks?.bearingPass} />
         <ResultRow label="Slenderness h/t" value={fmt(inPlane.slenderness?.outOfPlaneSlenderness, 2)} unit="" pass={!inPlane.checks?.slendernessWarning} warning={inPlane.checks?.slendernessWarning} />
       </Paper>
+
       {/* v0.6.2 —— 边缘构件局部压弯 N-M 结果与图表 */}
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-        <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>
-          Boundary Element Local N-M Interaction (Lintel Edge Load)
-        </Typography>
+        <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>Boundary Element Local N-M Interaction (Lintel Edge Load)</Typography>
         {bn.available === false ? (
-          <Alert severity="info">
-            Boundary element local N-M check not applicable with current inputs.
-            （当前输入下边缘构件局部压弯验算不适用。）
-          </Alert>
+          <Alert severity="info">Boundary element local N-M check not applicable with current inputs.</Alert>
         ) : (
           <>
             <ResultRow label="Boundary section (b × h)" value={`${fmt(bn.section?.bc, 0)} × ${fmt(bn.section?.hc, 0)}`} unit="mm" />
@@ -2103,7 +1521,7 @@ function ResultsTab({ inputs, results }) {
             <ResultRow label="φP0 (pure compression)" value={fmt(bn.keyPoints?.phiP0, 0)} unit="kN" />
             <ResultRow label="Balanced point (φNb, φMb)" value={`${fmt(bn.keyPoints?.phiNb, 0)} / ${fmt(bn.keyPoints?.phiMb, 1)}`} unit="kN / kN·m" />
             <ResultRow label="φM0 (pure bending)" value={fmt(bn.keyPoints?.phiM0, 1)} unit="kN·m" />
-            <ResultRow label="Governing demand (N*, M*)" value={`${fmt(bn.governing?.N, 1)} / ${fmt(bn.governing?.M, 2)}`} unit="kN / kN·m" />
+            <ResultRow label="Governing demand (N , M*)" value={`${fmt(bn.governing?.N, 1)} / ${fmt(bn.governing?.M, 2)}`} unit="kN / kN·m" />
             <ResultRow label="Boundary N-M UR" value={fmt((bn.checks?.governingUR || 0) * 100, 1)} unit="%" pass={inPlane.checks?.boundaryNMPass} highlight />
             <Box sx={{ mt: 1.5 }}>
               <NMInteractionChart boundary={bn} />
@@ -2111,6 +1529,7 @@ function ResultsTab({ inputs, results }) {
           </>
         )}
       </Paper>
+
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>Out-of-Plane Design Summary</Typography>
         <ResultRow label="Support (Wind & Seismic)" value={sc.windSeismic || 'Pinned-Pinned'} unit="" />
@@ -2123,29 +1542,22 @@ function ResultsTab({ inputs, results }) {
         <ResultRow label="Footing UR (UR6)" value={fmt((outOfPlane.UR6 || 0) * 100, 1)} unit="%" pass={outOfPlane.UR6 <= 1} />
         <ResultRow label="Overall OOP" value={outOfPlane.overallOK ? 'PASS' : 'FAIL'} pass={outOfPlane.overallOK} highlight />
       </Paper>
+
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-        <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>
-          OOP Part Seismic Action (AS/NZS 1170.5 Ch.8 - Full Compliance)
-        </Typography>
-        
-        {/* 新增：底层参数展示 */}
+        <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>OOP Part Seismic Action (AS/NZS 1170.5 Ch.8 - Full Compliance)</Typography>
         <ResultRow label="Part Factors (ap / Rp / μp)" value={`${fmt(outOfPlane.partSeismic?.ap, 2)} / ${fmt(outOfPlane.partSeismic?.Rp, 2)} / ${fmt(outOfPlane.partSeismic?.mu_p, 2)}`} unit="" />
         <ResultRow label="Periods (Tp / Tn)" value={`${fmt(outOfPlane.partSeismic?.Tp, 2)} / ${fmt(outOfPlane.partSeismic?.Tn, 2)}`} unit="s" />
         <ResultRow label="Importance Factor I" value={fmt(outOfPlane.partSeismic?.I, 2)} unit="" />
-        
-        {/* 核心计算结果 */}
         <ResultRow label="Response Coefficient Sp" value={fmt(outOfPlane.partSeismic?.Sp, 3)} unit="" />
         <ResultRow label="Component Factor Cp" value={fmt(outOfPlane.partSeismic?.Cp, 3)} unit="" />
         <ResultRow label="Height factor H" value={fmt(outOfPlane.partSeismic?.H, 3)} unit="" />
         <ResultRow label="Wall panel weight Wp" value={fmt(outOfPlane.partSeismic?.Wp, 3)} unit="kN/m" />
-        
-        {/* 地震力对比 */}
         <ResultRow label="Calculated Fp" value={fmt(outOfPlane.partSeismic?.Fp, 3)} unit="kN/m" />
         <ResultRow label="Minimum Fp,min (Safety Net)" value={fmt(outOfPlane.partSeismic?.Fp_min, 3)} unit="kN/m" />
         <ResultRow label="Design Fp (Governing)" value={fmt(outOfPlane.partSeismic?.Fp_design, 3)} unit="kN/m" highlight />
-        
         <ResultRow label="Uniform seismic pressure WE" value={fmt(outOfPlane.WE, 3)} unit="kPa" />
       </Paper>
+
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>Support Condition Moment Adjustments</Typography>
         <ResultRow label="W&S Mid-height factor" value={fmt(sc.windSeismicFactors?.mid, 4)} unit="×wL²" />
@@ -2155,6 +1567,7 @@ function ResultsTab({ inputs, results }) {
         <ResultRow label="W&S base adjustment" value={fmt(sc.wsBaseAdjust, 3)} unit="×" />
         <ResultRow label="Fire adjustment" value={fmt(sc.fireAdjust, 3)} unit="×" />
       </Paper>
+
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>Connection Design Summary (Base Connection)</Typography>
         <ResultRow label="Shear demand V*" value={fmt(connection.demand?.Vstar, 2)} unit="kN" />
@@ -2167,6 +1580,7 @@ function ResultsTab({ inputs, results }) {
         <ResultRow label="Connection tension UR" value={fmt((connection.ratios?.tensionRatio || 0) * 100, 1)} unit="%" pass={connection.checks?.tensionPass} />
         <ResultRow label="Grout bearing UR" value={fmt((connection.ratios?.bearingRatio || 0) * 100, 1)} unit="%" pass={connection.checks?.bearingPass} />
       </Paper>
+
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>In-Plane Foundation Summary</Typography>
         <ResultRow label="Footing self-weight" value={fmt(foundation.Gfooting, 2)} unit="kN" />
@@ -2178,6 +1592,7 @@ function ResultsTab({ inputs, results }) {
         <ResultRow label="Sliding resistance μN" value={fmt(foundation.slidingResistance, 2)} unit="kN" />
         <ResultRow label="Sliding UR" value={fmt((foundation.slidingRatio || 0) * 100, 1)} unit="%" pass={foundation.checks?.slidingPass} />
       </Paper>
+
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>Gravity Load Conversion</Typography>
         <ResultRow label="G Pressure" value={fmt(inPlane.gravity?.gPressure, 3)} unit="kPa" />
@@ -2186,6 +1601,7 @@ function ResultsTab({ inputs, results }) {
         <ResultRow label="G Line Load" value={fmt(inPlane.gravity?.gLineLoad, 3)} unit="kN/m" />
         <ResultRow label="Q Line Load" value={fmt(inPlane.gravity?.qLineLoad, 3)} unit="kN/m" />
       </Paper>
+
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>OOP Additional Point Load Effects</Typography>
         <ResultRow label="Additional Force" value={fmt(outOfPlane.additionalLoads?.F_add, 2)} unit="kN" />
@@ -2193,6 +1609,7 @@ function ResultsTab({ inputs, results }) {
         <ResultRow label="Additional Moment" value={fmt(outOfPlane.additionalLoads?.M_add, 2)} unit="kN·m" />
         <ResultRow label="Moment Height" value={fmt(outOfPlane.additionalLoads?.h_moment, 2)} unit="m" />
       </Paper>
+
       <Accordion sx={{ mb: 1.5 }}>
         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
           <Typography sx={{ fontWeight: 800 }}>In-Plane Reinforcement</Typography>
@@ -2205,6 +1622,7 @@ function ResultsTab({ inputs, results }) {
           <ResultRow label="Boundary tension capacity" value={fmt(inPlane.reinforcement?.boundarySteelTensionCapacity, 2)} unit="kN" />
         </AccordionDetails>
       </Accordion>
+
       <Accordion sx={{ mb: 1.5 }}>
         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
           <Typography sx={{ fontWeight: 800 }}>Out-of-Plane Properties</Typography>
@@ -2219,9 +1637,9 @@ function ResultsTab({ inputs, results }) {
           <ResultRow label="Δu" value={fmt(outOfPlane.delta_u, 1)} unit="mm" />
         </AccordionDetails>
       </Accordion>
+
       <Alert severity="warning" sx={{ mt: 2, mb: 2 }}>
-        The UI displays results from the calculation engine. Final design must be verified
-        against applicable NZ Standards and project-specific requirements.
+        The UI displays results from the calculation engine. Final design must be verified against applicable NZ Standards and project-specific requirements.
       </Alert>
     </Box>
   );
@@ -2229,27 +1647,24 @@ function ResultsTab({ inputs, results }) {
 
 /* ============================================================================
    MAIN COMPONENT
-========================================================================== */
+============================================================================ */
 export default function PrecastPanel() {
   const [activeTab, setActiveTab] = useState(0);
   const [inputs, setInputs] = useState(DEFAULT_INPUTS);
   const [reportOpen, setReportOpen] = useState(false);
-  /* v0.6.1 —— Detail Report 打开状态 */
   const [detailReportOpen, setDetailReportOpen] = useState(false);
+
   const calculationInput = useMemo(() => ({
     ...inputs,
-    /* 1. wall */
     wallWidth: safe(inputs.wallWidth),
     wallHeight: safe(inputs.wallHeight),
     wallThickness: safe(inputs.wallThickness),
-    /* 2. 平面外尺寸 */
     tf: safe(inputs.tf),
     Lf: safe(inputs.Lf),
     ts: safe(inputs.ts),
     fo: safe(inputs.fo),
     ds: safe(inputs.ds),
     hroof: safe(inputs.hroof),
-    /* 3. 材料 */
     concreteDensity: safe(inputs.concreteDensity),
     fc: safe(inputs.fc),
     fy: safe(inputs.fy),
@@ -2257,7 +1672,6 @@ export default function PrecastPanel() {
     Es: safe(inputs.Es, 200000),
     gs: safe(inputs.gs),
     cover: safe(inputs.cover),
-    /* 9. 钢筋 */
     VbarDia: safe(inputs.VbarDia),
     VbarSpace: safe(inputs.VbarSpace),
     HbarDia: safe(inputs.HbarDia),
@@ -2265,34 +1679,27 @@ export default function PrecastPanel() {
     FootBarDia: safe(inputs.FootBarDia),
     FootBarSpace: safe(inputs.FootBarSpace),
     MeshArea: safe(inputs.MeshArea),
-    /* 10. 边缘构件 */
     boundaryWidth: safe(inputs.boundaryWidth),
     boundaryThickness: safe(inputs.boundaryThickness, safe(inputs.wallThickness)),
     boundaryBarDiameter: safe(inputs.boundaryBarDiameter),
     boundaryBarCount: safe(inputs.boundaryBarCount),
     boundaryTieDiameter: safe(inputs.boundaryTieDiameter),
     boundaryTieSpacing: safe(inputs.boundaryTieSpacing),
-
-    /* 4. 荷载 */
     gUniform: safe(inputs.gUniform),
     qUniform: safe(inputs.qUniform),
     wwd: safe(inputs.wwd),
     Sr: safe(inputs.Sr),
-    /* 5. 平面内荷载 */
     diaphragmWindForce: safe(inputs.diaphragmWindForce),
     diaphragmSeismicForce: safe(inputs.diaphragmSeismicForce),
     lintelReaction: safe(inputs.lintelReaction),
     lintelEccentricity: safe(inputs.lintelEccentricity),
-    /* 6. 平面外荷载 */
     wwf: safe(inputs.wwf),
     wf: safe(inputs.wf),
     th: safe(inputs.th),
-    /* 7. 平面外附加荷载 */
     additionalForce: safe(inputs.additionalForce),
     additionalForceHeight: safe(inputs.additionalForceHeight),
     additionalMoment: safe(inputs.additionalMoment),
     additionalMomentHeight: safe(inputs.additionalMomentHeight),
-    /* 8. 地震参数 */
     hazardFactor: safe(inputs.hazardFactor),
     returnPeriodFactor: safe(inputs.returnPeriodFactor),
     ductility: safe(inputs.ductility),
@@ -2303,7 +1710,6 @@ export default function PrecastPanel() {
     seismicWeight: safe(inputs.seismicWeight),
     seismicDistributionFactor: safe(inputs.seismicDistributionFactor),
     psiE: safe(inputs.psiE),
-    /* v0.6 —— OOP part 地震参数 */
     partResponseCoefficient: safe(inputs.partResponseCoefficient),
     partHeightHx: safe(inputs.partHeightHx),
     buildingHeightHn: safe(inputs.buildingHeightHn),
@@ -2313,21 +1719,15 @@ export default function PrecastPanel() {
     partPeriod: safe(inputs.partPeriod),
     buildingPeriod: safe(inputs.buildingPeriod),
     importanceFactor: safe(inputs.importanceFactor),
-
-
-    /* 11. 过梁承压 */
     bearingWidth: safe(inputs.bearingWidth),
     bearingLength: safe(inputs.bearingLength),
-    /* 12. 分项系数和支承条件 */
     supportWindSeismic: inputs.supportWindSeismic || 'Pinned-Pinned',
     supportFire: inputs.supportFire || 'Fixed-Free',
     effectiveLengthFactor: safe(inputs.effectiveLengthFactor, 1),
     phiFlexure: safe(inputs.phiFlexure, 0.8),
     phiShear: safe(inputs.phiShear, 0.75),
     phiCompression: safe(inputs.phiCompression, 0.75),
-    /* 13. 地基承载力 */
     qU: safe(inputs.qU),
-    /* 14. 基础连接 */
     baseDowelDiameter: safe(inputs.baseDowelDiameter),
     baseDowelCount: safe(inputs.baseDowelCount),
     baseDowelEmbedment: safe(inputs.baseDowelEmbedment),
@@ -2336,12 +1736,12 @@ export default function PrecastPanel() {
     shearKeyDepth: safe(inputs.shearKeyDepth),
     frictionCoefficient: safe(inputs.frictionCoefficient),
     phiConnection: safe(inputs.phiConnection),
-    /* 15. 平面内基础 */
     footingWidth: safe(inputs.footingWidth),
     footingLength: safe(inputs.footingLength),
     footingThickness: safe(inputs.footingThickness),
     allowableBearingPressure: safe(inputs.allowableBearingPressure, 150)
   }), [inputs]);
+
   const results = useMemo(() => {
     try {
       return calculatePrecastPanelDesign(calculationInput);
@@ -2350,14 +1750,17 @@ export default function PrecastPanel() {
       return { summary: { overallPass: false }, calculationError: error?.message || 'Calculation engine error.' };
     }
   }, [calculationInput]);
+
   const handleReset = () => {
     setInputs({ ...DEFAULT_INPUTS, date: new Date().toISOString().split('T')[0] });
     setActiveTab(0);
   };
+
   const statusLabel = results.calculationError ? 'CALCULATION ERROR'
     : results.summary?.overallPass ? 'DESIGN PASS' : 'CHECK REQUIRED';
   const statusColor = results.calculationError ? 'error'
     : results.summary?.overallPass ? 'success' : 'warning';
+
   return (
     <Box sx={{ width: '100%', minHeight: '100%', bgcolor: '#f5f7fa', py: 2 }}>
       <Box sx={{ width: '100%', maxWidth: 1600, mx: 'auto', px: { xs: 1, sm: 2, md: 3 } }}>
@@ -2384,12 +1787,13 @@ export default function PrecastPanel() {
               <Button variant="contained" size="small" color="secondary" startIcon={<PictureAsPdfIcon />}
                 onClick={() => setDetailReportOpen(true)}> Detail Report
               </Button>
-              <Button variant="outlined" size="small" startIcon={<RestartAltIcon />} 
+              <Button variant="outlined" size="small" startIcon={<RestartAltIcon />}
                 onClick={handleReset}> Reset
               </Button>
             </Stack>
           </Stack>
         </Paper>
+
         <Paper elevation={1} sx={{ mb: 2 }}>
           <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} variant="scrollable" scrollButtons="auto">
             <Tab icon={<EngineeringIcon />} iconPosition="start" label="Input & Model"
@@ -2400,18 +1804,21 @@ export default function PrecastPanel() {
               sx={{ textTransform: 'none', fontWeight: activeTab === 2 ? 800 : 500 }} />
           </Tabs>
         </Paper>
+
         {activeTab === 0 && <InputTab inputs={inputs} setInputs={setInputs} previewResults={results} />}
         {activeTab === 1 && <CalculationTab inputs={calculationInput} results={results} />}
         {activeTab === 2 && <ResultsTab inputs={calculationInput} results={results} />}
       </Box>
-      {/* Summary Report Dialog（简易报告，两栏公式） */}
+
+      {/* Summary Report Dialog */}
       <PrecastPanelReportDialog
         open={reportOpen}
         onClose={() => setReportOpen(false)}
         inputs={calculationInput}
         results={results}
       />
-      {/* v0.6.1 —— Detail Report Dialog（详细报告，打印排版，完整公式 + SVG） */}
+
+      {/* v0.6.1 —— Detail Report Dialog */}
       <PrecastPanelDetailReportDialog
         open={detailReportOpen}
         onClose={() => setDetailReportOpen(false)}
