@@ -171,7 +171,8 @@ export const INPUT_SECTIONS = [
       { key: 'HbarSpace', label: 'Horizontal Bar Spacing', unit: 'mm', step: '25', min: '50' },
       { key: 'FootBarDia', label: 'Footing Bar Diameter (φF)', unit: 'mm', step: '2', min: '6' },
       { key: 'FootBarSpace', label: 'Footing Bar Spacing', unit: 'mm', step: '25', min: '50' },
-      { key: 'MeshArea', label: 'Slab Mesh Area (As)', unit: 'mm²/m', step: '1', min: '0' }
+      { key: 'MeshArea', label: 'Slab Mesh Area (As)', unit: 'mm²/m', step: '1', min: '0' },
+      { key: 'BarLayers', label: 'Number of Bar Layers', unit: 'layers', step: '1', min: '1' }
     ]
   },
   {
@@ -368,6 +369,7 @@ export const DEFAULT_INPUTS = {
   FootBarDia: 12,
   FootBarSpace: 375,
   MeshArea: 142,
+  BarLayers: 1,
 
   /* --------------------------------------------------------------------------
   10. Boundary Element (In-Plane)

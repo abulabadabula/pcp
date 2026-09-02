@@ -513,6 +513,7 @@ function InputSummaryTable({ inputs }) {
     /* bar and others */
     ['Vertical bar φV@Sv (竖向筋)', `${tx(inputs.VbarDia, 0)} @ ${tx(inputs.VbarSpace, 0)}`, 'mm'],
     ['Horizontal bar φH@Sh (水平筋)', `${tx(inputs.HbarDia, 0)} @ ${tx(inputs.HbarSpace, 0)}`, 'mm'],
+    ['BarLayers (纵筋层数)', tx(inputs.BarLayers, 0), 'layers'],
     ['Footing bar φF@Sf (基础筋)', `${tx(inputs.FootBarDia, 0)} @ ${tx(inputs.FootBarSpace, 0)}`, 'mm'],
     ['Boundary width (边缘构件宽)', tx(inputs.boundaryWidth), 'm'],
     ['Boundary bars (边缘纵筋)', `${tx(inputs.boundaryBarCount, 0)}-φ${tx(inputs.boundaryBarDiameter, 0)}`, ''],
@@ -882,20 +883,29 @@ function InPlaneChecksBlock({ inputs, inPlane }) {
       </CalculationSubsection>
 
       {/* 5.7 IN-PLANE SHEAR */}
-      <CalculationSubsection title="5.7 In-plane shear · 平面内抗剪" >
+      <CalculationSubsection title="5.7 In-plane shear · 平面内抗剪 (NZS 3101)" >
         <CalculationFormula
-          caption="Web width & shear depth / 腹板宽度与有效剪深"
-          formula={`b_w = ${tx(sh.bw, 0)} \\,\\mathrm{mm}, \\qquad d_v = ${tx(sh.dv, 0)} \\,\\mathrm{mm}`} />
+          caption="Web width, shear depth & area / 腹板宽度、有效剪深与抗剪面积"
+          formula={`b_w = t = ${tx(sh.bw, 0)} \\,\\mathrm{mm}, \\quad d_v = 0.8 l_w = ${tx(sh.dv, 0)} \\,\\mathrm{mm}, \\quad A_{cv} = ${tx(sh.Acv, 0)} \\,\\mathrm{mm^2}`} />
+        
         <CalculationFormula
-          caption="Concrete shear capacity / 混凝土抗剪"
-          formula={`V_c = ${tx(sh.vc)} \\,\\mathrm{kN}, \\qquad \\phi V_c = ${tx(sh.phiVc)} \\,\\mathrm{kN}`} />
+          caption="Concrete nominal shear stress v_c / 混凝土名义抗剪应力 (考虑轴力)"
+          formula={`v_c = (0.1 + 0.15\\nu)\\sqrt{f'_c} \\le 0.33\\sqrt{f'_c} \\quad \\Rightarrow \\quad V_c = ${tx(sh.vc)} \\,\\mathrm{kN}, \\; \\phi V_c = ${tx(sh.phiVc)} \\,\\mathrm{kN}`} />
+          
+        <CalculationFormula
+          caption="Shear limit & section size check / 抗剪上限与截面尺寸验算"
+          formula={`V_{n,max} = 0.33\\sqrt{f'_c}A_{cv} = ${tx(sh.Vn_max)} \\,\\mathrm{kN}, \\quad V_{n,req} = \\frac{V^*}{\\phi} = ${tx(sh.Vn_required)} \\,\\mathrm{kN}`}
+          status={mkStatus(sh.sectionSizeOK, 'SIZE OK', 'SIZE FAIL')} />
+          
         <CalculationFormula
           caption="Horizontal reinforcement contribution / 水平钢筋抗剪贡献"
-          formula={`V_s = ${tx(sh.VsProvided)} \\,\\mathrm{kN}`} />
+          formula={`V_s = \\frac{A_{sh} f_y d_v}{s_h} = ${tx(sh.VsProvided)} \\,\\mathrm{kN}`} />
+          
         <CalculationFormula
-          caption="Design shear capacity / 设计抗剪承载力"
-          formula={`\\phi V_n = ${tx(sh.shearCapacity)} \\,\\mathrm{kN}`}
+          caption="Total design shear capacity / 总设计抗剪承载力"
+          formula={`\\phi V_n = \\phi(V_c + V_s) = ${tx(sh.shearCapacity)} \\,\\mathrm{kN}`}
           highlight />
+          
         <CalculationFormula
           caption="Shear utilisation / 抗剪利用率"
           formula={`UR_V = \\frac{V^*}{\\phi V_n} = \\frac{${tx(Vstar)}}{${tx(sh.shearCapacity)}} = ${txUR(sh.shearRatio)} = ${txPct(sh.shearRatio)} \\%`}
@@ -1676,6 +1686,7 @@ export default function PrecastPanel() {
     VbarSpace: safe(inputs.VbarSpace),
     HbarDia: safe(inputs.HbarDia),
     HbarSpace: safe(inputs.HbarSpace),
+    BarLayers: safe(inputs.BarLayers),
     FootBarDia: safe(inputs.FootBarDia),
     FootBarSpace: safe(inputs.FootBarSpace),
     MeshArea: safe(inputs.MeshArea),

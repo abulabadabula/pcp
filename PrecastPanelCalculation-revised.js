@@ -536,12 +536,22 @@ export function calculateInPlaneDesign(input = {}) {
     const VbarSpace = positive(input.VbarSpace);
     const HbarDia = positive(input.HbarDia);
     const HbarSpace = positive(input.HbarSpace);
+
     const vBarArea = areaBar(VbarDia);
     const hBarArea = areaBar(HbarDia);
+
+    // 根据 NZS 3101 Clause 11.7.2，墙厚 > 200mm 强制/通常为双层，≤ 200mm 为单层。
+    // 优先读取 UI 传入的层数，若无则根据墙厚(twall)自动推断。
+    const numLayers = input.BarLayers 
+        ? positive(input.BarLayers) 
+        : (twall > 200 ? 2 : 1);
+
     const nVerticalBars = VbarSpace > 0 ? Math.floor(bmm / VbarSpace) + 1 : 0;
     const AsDistributed = nVerticalBars * vBarArea;
     const rhoVertical = Ag > 0 ? AsDistributed / Ag : 0;
-    const AsHorizontalPerM = HbarSpace > 0 ? hBarArea * 1000 / HbarSpace : 0;
+    const AsHorizontalPerM = HbarSpace > 0 ? (hBarArea * numLayers) * 1000 / HbarSpace : 0;
+    const rhoHorizontal = Ag > 0 ? (AsHorizontalPerM * tmm / 1000) / Ag : 0;
+
     const AsBoundary = positive(input.boundaryBarCount) * areaBar(positive(input.boundaryBarDiameter));
     const boundaryArea = positive(input.boundaryWidth) * 1000 * positive(input.boundaryThickness, twall) * 1000;
     const rhoBoundary = boundaryArea > 0 ? AsBoundary / boundaryArea : 0;
@@ -635,31 +645,55 @@ export function calculateInPlaneDesign(input = {}) {
     const axialRatio = phiPn > 0 ? NseismicCompression / phiPn : boundaryNM.available ? Infinity : 0;
     const momentRatio = phiMn > 0 ? Mtotal / phiMn : boundaryNM.available ? Infinity : 0;
     const interactionRatio = boundaryNM.available ? boundaryNM.checks.governingUR : 0;
+
     /* ------------------------------------------------------------------------
-    In-plane wall shear.
-    NZS 3101 wall shear:
-    d = 0.8 Lw
-    Acv = Lw t
-    For a horizontal section, the vertical reinforcement crosses the shear
-    plane and is therefore used for the shear reinforcement contribution.
-    ======================================================================= */
-    const dv = 0.8 * bmm;
-    const Acv = bmm * tmm;
-    const vc = 0.17 * Math.sqrt(Math.max(fc, 0)) * Acv / 1000;
-    const phiShear = positive(input.phiShear, 0.75);
-    const phiVc = phiShear * vc;
-    const VsRequired = max0(Vtotal - phiVc);
-    /*
-    Vertical reinforcement per metre of wall.
-    The UI represents distributed vertical reinforcement by diameter and
-    spacing. The factor of 2 assumes the same reinforcement is present on
-    both faces, consistent with the existing wall input convention.
-    */
-    const AvPerM = VbarSpace > 0 ? 2 * vBarArea * 1000 / VbarSpace : 0;
-    const VsProvided = AvPerM * fy * dv / 1000;
-    const shearCapacity = phiVc + phiShear * VsProvided;
-    const shearRatio = shearCapacity > 0 ? Vtotal / shearCapacity :
-        Vtotal > 0 ? Infinity : 0;
+    IN-PLANE SHEAR DESIGN (REVISED PER NZS 3101)
+    ----------------------------------------------------------------------- */
+    const dv = 0.8 * bmm; // 有效抗剪高度 (近似取 0.8 * 墙长 Lw)
+    const Acv = bmm * tmm; // 混凝土抗剪截面面积 (墙长 * 墙厚)
+    const phiShear = positive(input.phiShear, 0.75); // 抗剪折减系数
+
+    // 1. 混凝土抗剪 Vc (NZS 3101 Cl 13.2.5 / 11.2.7)
+    // 考虑轴向力 Ngravity (kN) 的影响
+    const Ag_mm2 = bmm * tmm;
+    const Nstar_N = Ngravity * 1000; // 转换为 N
+    const nu = Nstar_N / Ag_mm2; // 轴向应力 (MPa)，压力为正，拉力为负
+
+    let vc_MPa = 0;
+    // NZS 3101 简化公式：Vc = (0.1 + 0.15 * nu) * sqrt(fc) * Acv
+    // 注意：如果 nu 为负（拉力），Vc 会降低；如果 nu 很大，Vc 会提高。
+    vc_MPa = (0.1 + 0.15 * (nu / 1000)) * Math.sqrt(Math.max(fc, 0)); // nu 需转换为 MPa 参与计算，若 N 为 kN，则 nu = N*1000 / Ag_mm2
+    // 修正：nu 已经是 MPa (N / mm^2)
+    vc_MPa = (0.1 + 0.15 * nu) * Math.sqrt(Math.max(fc, 0)); 
+
+    vc_MPa = Math.max(vc_MPa, 0); // 混凝土不能承受负剪力
+    vc_MPa = Math.min(vc_MPa, 0.33 * Math.sqrt(Math.max(fc, 0))); // 规范上限
+    const vc = vc_MPa * Acv / 1000; // 转换为 kN
+    const phiVc = phiShear * vc; 
+
+    // 2. 截面抗剪上限 Vn,max (防斜压破坏, NZS 3101 Cl 11.2.3)
+    const Vn_max_MPa = 0.33 * Math.sqrt(Math.max(fc, 0)); 
+    const Vn_max = Vn_max_MPa * Acv / 1000; // kN
+    const Vn_required = Vtotal / phiShear; // 需要的名义抗剪承载力
+    const sectionSizeOK = Vn_required <= Vn_max; // 截面尺寸是否满足要求
+
+    // 3. 钢筋抗剪 Vs (必须使用水平钢筋 Hbar!)
+    // NZS 3101 Cl 11.2.8: Vs = (Ash * fy * d) / sh
+    const As_h = hBarArea; // 单根水平钢筋面积 (mm2)
+    const sh = HbarSpace; // 水平钢筋间距 (mm)
+    let VsProvided = 0;
+    if (sh > 0 && As_h > 0) {
+        VsProvided = (As_h * numLayers / sh) * fy * dv / 1000; // kN, 注意考虑钢筋层数 numLayers
+        console.log("VsProvided,As_h,sh,fy,dv:", VsProvided, As_h, sh, fy, dv);
+    }
+
+    // 4. 总抗剪承载力与利用率
+    const Vn = vc + VsProvided;
+    const phiVn = phiShear * Vn;
+    const shearCapacity = phiVn; 
+    const shearRatio = shearCapacity > 0 ? Vtotal / shearCapacity : Vtotal > 0 ? Infinity : 0;
+
+    // 5. 未折减的剪力 (用于基础等其他验算)
     const VsRequiredUnfactored = max0(Vtotal / Math.max(phiShear, 1e-9) - vc);
     /* ------------------------------------------------------------------------
     Base / foundation actions.
@@ -729,12 +763,7 @@ export function calculateInPlaneDesign(input = {}) {
             Nt,
             Gi,
         },
-        diaphragm: {
-            VdiaphragmWind,
-            VdiaphragmSeismic,
-            MdiaphragmWind,
-            MdiaphragmSeismic
-        },
+        diaphragm: {VdiaphragmWind,VdiaphragmSeismic,MdiaphragmWind,MdiaphragmSeismic },
         sectionActions: {
             seismicGravity,
             NseismicCompression,
@@ -755,17 +784,8 @@ export function calculateInPlaneDesign(input = {}) {
             Ncompression,
             Ntension
         },
-        slenderness: {
-            aspectRatio,
-            outOfPlaneSlenderness,
-            wallClassification
-        },
-        bearing: {
-            bearingArea,
-            bearingStress,
-            bearingCapacity,
-            bearingRatio
-        },
+        slenderness: { aspectRatio, outOfPlaneSlenderness, wallClassification },
+        bearing: { bearingArea, bearingStress, bearingCapacity, bearingRatio},
         interaction: {
             compressionConcrete: boundaryNM.available ?
                 boundaryNM.keyPoints.P0 * 1000 :
@@ -780,23 +800,9 @@ export function calculateInPlaneDesign(input = {}) {
             momentRatio,
             interactionRatio
         },
-        shear: {
-            bw: tmm,
-            dv,
-            Acv,
-            vc,
-            phiVc,
-            VsRequired,
-            VsRequiredUnfactored,
-            VsProvided,
-            shearCapacity,
-            shearRatio
-        },
-        foundation: {
-            foundationShear,
-            foundationMoment,
-            tensionDemand
-        },
+        shear: { bw: tmm, dv, Acv, vc, phiVc, Vn_required, VsRequiredUnfactored,
+             VsProvided, shearCapacity, shearRatio, Vn_max, sectionSizeOK }, 
+        foundation: { foundationShear, foundationMoment, tensionDemand},
         boundaryNM,
         sectionChecks,
         checks: {
@@ -806,7 +812,8 @@ export function calculateInPlaneDesign(input = {}) {
             shearPass,
             tensionPass,
             slendernessWarning,
-            boundaryNMPass: boundaryNM.checks.pass
+            boundaryNMPass: boundaryNM.checks.pass,
+            sectionSizeOK: sectionSizeOK
         }
     };
 }
