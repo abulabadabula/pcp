@@ -34,10 +34,10 @@ SUPPORT CONDITIONS
 Coefficients are coefficients in M = k w L².
 =========================================================================== */
 const SUPPORT_MOMENT_FACTORS = {
-    'Pinned-Pinned': { mid: 1 / 8, base: 0 },
-    'Fixed-Free': { mid: 1 / 8, base: 1 / 2 },
-    'Fixed-Fixed': { mid: 1 / 24, base: 1 / 12 },
-    'Fixed-Pinned': { mid: 9 / 128, base: 1 / 8 }
+    'Pinned-Pinned': { mid: 1 / 8, base: 0, frequency: 2 / Math.PI},
+    'Fixed-Free': { mid: 1 / 8, base: 1 / 2, frequency: (2 * Math.PI) / Math.pow(1.875, 2) },
+    'Fixed-Fixed': { mid: 1 / 24, base: 1 / 12, frequency: (2 * Math.PI) / Math.pow(4.73, 2) },
+    'Fixed-Pinned': { mid: 9 / 128, base: 1 / 8, frequency: (2 * Math.PI) / Math.pow(3.926, 2) }
 };
 const getSupportFactors = (condition) =>
     SUPPORT_MOMENT_FACTORS[condition] || SUPPORT_MOMENT_FACTORS['Pinned-Pinned'];
@@ -834,12 +834,16 @@ export function calculateOutOfPlaneDesign(input = {}) {
     /* hroof validation */
     const { hroofEffective, hroofMax, hroofValid } = validateHroof(input);
     const hroof = hroofEffective;
+    
     const gammaSoil = positive(input.gs, 18);
     const gammaConcrete = positive(input.concreteDensity, 24);
     const fy = positive(input.fy);
     const fyMesh = positive(input.fyMesh);
     const fc = positive(input.fc);
     const Es = positive(input.Es, 200000);
+    const Ec = 4700*Math.sqrt(Math.max(fc, 0))*(gammaConcrete/23)**1.5; // MPa
+    const n = Ec > 0 ? Es / Ec : 0;
+
     /* Unified reinforcement */
     const Vbar = positive(input.VbarDia);
     const Vspace = Math.max(positive(input.VbarSpace), 0.001);
@@ -876,11 +880,7 @@ export function calculateOutOfPlaneDesign(input = {}) {
     const h_force = positive(input.additionalForceHeight);
     const M_add = finite(input.additionalMoment);
     const h_moment = positive(input.additionalMomentHeight);
-    /*
-    Concrete elastic modulus. Existing UI behaviour retained.
-    */
-    const Ec = 3320 * Math.sqrt(Math.max(fc, 0)) + 6900;
-    const n = Ec > 0 ? Es / Ec : 0;
+
     /*
     One-metre strip:一米宽条带计算
     Ag = t
@@ -890,7 +890,7 @@ export function calculateOutOfPlaneDesign(input = {}) {
     const Ag = tw * 1000;
     // 为啥墙厚取一半？
     const depthRebar = Math.max(tw * 1000 / 2 - cover - Vbar / 2, 1);
-    const Ig = Math.pow(tw * 1000, 3) / 12;
+    const Ig = 1000 * Math.pow(tw * 1000, 3) / 12;
     const Iw = Lw * Ig;
     const ZperM = tw > 0 ? Math.pow(tw, 2) / 6 : 0;
     const Z = Lw * ZperM;
@@ -918,35 +918,71 @@ export function calculateOutOfPlaneDesign(input = {}) {
     const Nmax = Math.max(1.35 * N_GE, 1.2 * N_GE + 1.5 * Wq_line);
     console.log("wd,wq,wallheighabovefooting,NSW,NFF,NSF,NHF", wd, wq, wallHeightAboveFooting, NSW, NFF, NSF, NHF)
     /* ------------------------------------------------------------------------
-    Part/component seismic action.
-    Existing interface is retained:
-    partResponseCoefficient
-    partHeightHx
-    buildingHeightHn
-    If partResponseCoefficient is supplied it is treated as the design
-    response coefficient Cp. The floor-height multiplier is retained as a
-    transparent legacy-compatible factor, but the calculation reports both
-    Cp and H separately.
-    NOTE: The current NZS 1170.5 Section 8 formulation should be confirmed
-    project-by-project because Cp depends on the part period and the
-    applicable spectral-shape provisions. This engine does not invent a
-    part period that is not supplied by the UI.
+    Part/component seismic action.AS/NZS 1170.5:2004 Clause 8.3.2
     ----------------------------------------------------------------------- */
-    const partCp = positive(input.partResponseCoefficient, 0.75);
+    const partDulicity = positive(input.partDuctilityFactorMu, 1);
+    const partCh0 = positive(input.partSpectralShapeFactorT0, 1.33);
+    const partC0 = partCh0 * positive(input.hazardFactor, 1) * positive(input.returnPeriodFactor, 1) * positive(input.nearFaultFactor, 1);
+
+    /* ------------------------------------------------------------------------
+    Part height amplification factor Chi (AS/NZS 1170.5:2004 §8.4.2.2)
+    根据 hi (part高度) 和 hn (建筑总高) 进行三个判断：
+    ----------------------------------------------------------------------- */
     const partHx = positive(input.partHeightHx);
     const partHn = positive(input.buildingHeightHn);
-    console.log("part Cp Hx Hn", partCp, partHx, partHn)
-    /*
-    Retain the existing UI's H calculation so result consumers do not break.
-    It is deliberately reported as a separate factor.
-    此处待检查!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    */
-    const partH = partHn > 0 ? 1 + 2 * Math.min(partHx / partHn, 1) : 1;
+    const CHi = (() => {
+        if (partHn <= 0) return 1.0; // 防止除以 0
+        
+        const candidates = [];
+        
+        // 公式 8.3(1): 适用于 hi < 12m
+        if (partHx < 12) {
+            candidates.push(1 + partHx / 6);
+        }
+        
+        // 公式 8.3(2) 和 8.3(3)
+        if (partHx < 0.2 * partHn) {
+            candidates.push(1 + 10 * (partHx / partHn));
+        } else {
+            candidates.push(3.0);
+        }
+        
+        // 规范规定：取适用公式中的较小值
+        return Math.min(...candidates);
+    })();
+    /* ------------------------------------------------------------------------
+    Part frequency
+     ----------------------------------------------------------------------- */
+    const C_coeff = wsFactors.frequency;
+    const rho = gammaConcrete * 1000 / 9.81;           // kg/m³
+    const A_strip = tw * 1;                            // m² (per metre width)
+    const Ec_Pa = Ec * 1e6;                            // Pa
+    const Ig_m4 = Math.pow(tw, 3) / 12;                // m⁴ (per metre width)
+    const partPeriod = C_coeff * Math.pow(hroof, 2) 
+                    * Math.sqrt(rho * A_strip / (Ec_Pa * Ig_m4));
+    
+    const partCiTp = (() => {
+        if (partPeriod <=0.7) return 2.0;
+        if (partPeriod < 1.5) return 2*(1.75 - partPeriod);
+        return 0.5;
+    })();
+
+    const partCpTp = partC0 * partCiTp * CHi;
+
+    const partCph = (() => {
+        if (partDulicity == 1) return 1.0;
+        if (partDulicity == 1.25) return 0.85;
+        if (partDulicity == 2.0) return 0.55;
+        if (partDulicity >= 3.0) return 0.45;
+        return 0.45;
+    })();
+
+    console.log("part Period:", partPeriod, "Cp:", partCiTp, "Hx:", partHx, "Hn:", partHn);
+
+
     const Wp_panel = gammaConcrete * (tw / 1000) * hroof;
-    const Fp_panel = partCp * partH * Wp_panel;
-    const WE_T1 = hroof > 0 ? Fp_panel / hroof : 0;
-    const WE_TE = WE_T1;
-    const WE = Math.max(WE_T1, WE_TE);
+    const Fp_panel = partCpTp * partCph * Wp_panel;
+
     /* ------------------------------------------------------------------------
     Wind pressure.
     ----------------------------------------------------------------------- */
@@ -959,7 +995,7 @@ export function calculateOutOfPlaneDesign(input = {}) {
     */
     const Lspan = Math.max(hroof, 0);
     const x_m = Lspan / 2;
-    const ME = WE * Lspan * Lspan * wsFactors.mid;
+    const ME = Fp_panel * Lspan * Lspan * wsFactors.mid;
     const MW = WindPressure * Lspan * Lspan * wsFactors.mid;
     let Ma = Math.max(ME, MW);
     const Na = N_GE;
@@ -976,7 +1012,7 @@ export function calculateOutOfPlaneDesign(input = {}) {
     const M_add_mid_F = F_add * Math.abs(h_force - x_m);
     const M_add_mid_M = M_add;
     Ma += M_add_mid_F + M_add_mid_M;
-    let MbE = WE * Lspan * Lspan * wsFactors.base;
+    let MbE = Fp_panel * Lspan * Lspan * wsFactors.base;
     let MbW = WindPressure * Lspan * Lspan * wsFactors.base;
     const M_add_base_F = F_add * h_force;
     const M_add_base_M = M_add;
@@ -1039,9 +1075,8 @@ export function calculateOutOfPlaneDesign(input = {}) {
     Horizontal reinforcement crosses the vertical shear plane and therefore
     remains the reinforcement used for this OOP shear contribution.
     ----------------------------------------------------------------------- */
-    const VE_T1 = (5 / 8) * WE * fireSpan;
-    const VE_TE = VE_T1;
-    const VE = Math.max(VE_T1, VE_TE) + F_add;
+
+    const VE = Fp_panel + F_add;
     const Vw = (5 / 8) * WindPressure * fireSpan + F_add;
     const vc1 = 0.25 * Math.sqrt(Math.max(fc, 0)) + (Ag > 0 ? Na / (4 * Ag) : 0);
     const Vc = vc1 * depthRebar / 1000;
@@ -1110,9 +1145,6 @@ export function calculateOutOfPlaneDesign(input = {}) {
         NHF,
         N_GE,
         Nmax,
-        WE_T1,
-        WE_TE,
-        WE,
         x_m,
         ME,
         MW,
@@ -1145,8 +1177,6 @@ export function calculateOutOfPlaneDesign(input = {}) {
         phiMn_fire,
         Mbf,
         UR3,
-        VE_T1,
-        VE_TE,
         VE,
         Vw,
         vc1,
@@ -1170,13 +1200,14 @@ export function calculateOutOfPlaneDesign(input = {}) {
         UR6,
         overallOK,
         partSeismic: {
-            Cp: partCp,
-            hx: partHx,
-            hn: partHn,
-            H: partH,
+            CHi,
+            partCiTp,
+            partPeriod,
+            partCph,
+            partC0,
+            partCpTp,
             Wp: Wp_panel,
             Fp: Fp_panel,
-            WE
         },
         hroofValidation: {
             hroofEffective,

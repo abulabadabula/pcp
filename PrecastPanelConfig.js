@@ -15,7 +15,7 @@ v0.6 说明：
 OOP 地震作用改按 AS/NZS 1170.5:2004 第 8 章（Parts and components）计算：
 墙体作为 part，Fp = Cp × H × Wp（§8.4.2.2 / §8.5.1）。
 移除旧的 OOP 地震系数输入 CdT1 / CdTE，新增 part 参数：
-  partResponseCoefficient —— Cp（Table 8.1，预制墙板默认 0.75）
+  partSpectralShapeFactorT0 —— Cp（Table 8.1，预制墙板默认 1.33）
   partHeightHx            —— hx（part 计算高度，默认取墙高中部）
   buildingHeightHn        —— hn（建筑总高）
 引擎内计算 H = 1 + 2(hx/hn)（§8.4.2.3），
@@ -150,7 +150,7 @@ export const INPUT_SECTIONS = [
     title: '9. Seismic Parameters (OOP)',
     fields: [
       /* v0.7 —— OOP 地震改按 AS/NZS 1170.5 Chapter 8 (parts) 计算  */
-      { key: 'partResponseCoefficient', label: 'OOP Part Response Coefficient Cp', unit: '', step: '0.05', min: '0' },
+      { key: 'partSpectralShapeFactorT0', label: 'OOP Part Response Coefficient Cp', unit: '', step: '0.05', min: '0' },
       { key: 'partHeightHx', label: 'OOP Part Height hx (above base)', unit: 'm', step: '0.1', min: '0' },
       { key: 'buildingHeightHn', label: 'Building Height hn', unit: 'm', step: '0.1', min: '0.1' },
       { key: 'partImportanceFactor', label: 'Part Importance Factor (ap)', unit: '', step: '0.1', min: '0' },
@@ -349,7 +349,7 @@ export const DEFAULT_INPUTS = {
   // seismicDistributionFactor: 1.0,
   psiE: 0.30,
   /* v0.6 —— AS/NZS 1170.5 Chapter 8 part 参数 */
-  partResponseCoefficient: 0.75,
+  partSpectralShapeFactorT0: 1.33,
   partHeightHx: 2.0,
   buildingHeightHn: 4.0,
   partImportanceFactor: 1.0,

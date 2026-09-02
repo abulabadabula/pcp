@@ -502,7 +502,7 @@ function InputSummaryTable({ inputs }) {
     ['N(T,D) (近断层系数)', tx(inputs.nearFaultFactor), ''],
     ['ψe (抗震组合系数)', tx(inputs.psiE), ''],
     /* v0.7 —— OOP part 地震参数 */
-    ['OOP part coefficient Cp (平面外 part 系数, Table 8.1)', tx(inputs.partResponseCoefficient), ''],
+    ['OOP part coefficient Cp (平面外 part 系数, Table 8.1)', tx(inputs.partSpectralShapeFactorT0), ''],
     ['OOP part hx / hn → H (part 高度放大系数)', `${tx(inputs.partHeightHx)} / ${tx(inputs.buildingHeightHn)} → ${tx(safe(inputs.buildingHeightHn) > 0 ? 1 + 2 * Math.min(safe(inputs.partHeightHx) / safe(inputs.buildingHeightHn), 1) : 1, 3)}`, 'm'],
     ['OOP Part ap (Importance)', tx(inputs.partImportanceFactor), ''],
     ['OOP Part Rp (Modification)', tx(inputs.partResponseModification), ''],
@@ -923,10 +923,25 @@ function OutOfPlaneWindSeismicBlock({ inputs, outOfPlane }) {
   const oopResult = outOfPlane || {};
   const hv = oopResult.hroofValidation || {};
   const sc = oopResult.supportConditions || {};
-  const add = oopResult.additionalLoads || {};
   const ps = oopResult.partSeismic || {};
   const wsF = sc.windSeismicFactors || { mid: 1 / 8, base: 1 / 8 };
   const hroofEff = safe(hv.hroofEffective);
+
+  // --- 新增：OOP Part Seismic 中间变量计算 (匹配 calculation-revised.js 逻辑) ---
+
+  const partCh0 = safe(inputs.partSpectralShapeFactorT0, 1.33);
+  const Z = safe(inputs.hazardFactor, 1); 
+  const Ru = safe(inputs.returnPeriodFactor, 1);
+  const Nt = safe(inputs.nearFaultFactor, 1);
+
+  const partiTp = safe(ps.partCiTp); // 引擎根据周期计算返回的 CiT_p
+  
+  const partDulicity = safe(inputs.partDuctility, 1); 
+
+  const Wp = safe(ps.Wp);
+  const Fp = safe(ps.Fp);
+  const WE = hroofEff > 0 ? Fp / hroofEff : 0;
+  // ---------------------------------------------------------------------------
 
   return (
     <CalculationSection number="6" title="Out-of-Plane Design (Wind & Seismic) · 平面外设计（风与地震）" chip={<Chip size="small" label="AS/NZS 1170.5 Ch.8 / NZS 3101" />}>
@@ -934,20 +949,33 @@ function OutOfPlaneWindSeismicBlock({ inputs, outOfPlane }) {
         <CalculationFormula caption="Effective hroof used / 实际采用值" highlight
           formula={`h_{roof,eff} = \\min(h_{roof},\\,h_{roof,max}) = ${tx(hv.hroofEffective)}\\,\\mathrm{m}`}
           status={mkStatus(hv.hroofValid, 'VALID', 'CLAMPED')} />
-        <CalculationFormula caption="Part height amplification factor H / part 高度放大系数 (§8.4.2.3)"
-          formula={`H = 1 + 2\\frac{h_x}{h_n} = 1 + 2\\times\\frac{${tx(ps.hx)}}{${tx(ps.hn)}} = ${tx(ps.H, 3)}`} />
+        
+        <CalculationFormula caption="site hazard coefficient C0 / 基础危险系数"
+          formula={`C_0 = C_h(T_0)\\,Z\\,R_u\\,N(T,D) = ${tx(partCh0)}\\times${tx(Z)}\\times${tx(Ru)}\\times${tx(Nt)} = ${tx(ps.partC0, 3)}`} />
+        
+        <CalculationFormula caption="Height amplification factor Chi / 高度放大系数 (§8.4.2.2)"
+          formula={`C_{Hi} = \\min\\left(1+\\frac{h_x}{6},\\; 1+10\\frac{h_x}{h_n} \\text{ or } 3.0\\right) = ${tx(ps.CHi, 3)}`} />
+        
         <CalculationFormula caption="Wall panel weight Wp / 墙板重量（每延米）"
-          formula={`W_p = \\gamma_c\\,t_w\\,h_{roof} = ${tx(ps.Wp)}\\,\\mathrm{kN/m}`} />
-        <CalculationFormula caption="Part component factor Cp / Part 构件系数 (§8.4.2.1)"
-          formula={`C_p = \\frac{a_p\\,S_p}{R_p\\,\\mu_p} = ${tx(ps.Cp, 3)}`} />
-        <CalculationFormula caption="Design seismic force Fp,design / 控制设计地震力" highlight
-          formula={`F_{p,design} = \\max(C_p H W_p,\\,0.3 S_p I W_p) = ${tx(ps.Fp_design)}\\,\\mathrm{kN/m}`} />
+          formula={`W_p = \\gamma_c\\,t_w\\,h_{roof} = ${tx(Wp)}\\,\\mathrm{kN/m}`} />
+        
+        <CalculationFormula caption="Period-dependent factor CiT(p) / 周期相关构件系数"
+          formula={`C_iT_p = ${tx(ps.partCiTp, 3)} \\quad \\text{(Derived from } T_p= ${tx(ps.partPeriod, 3)}s \\text{)} `} />
+        
+        <CalculationFormula caption="Ductility modification factor Cph / 延性折减系数"
+          formula={`C_{ph} = ${tx(ps.partCph, 3)} \\quad (\\mu_p = ${tx(partDulicity)})`} />
+        
+        <CalculationFormula caption="Design seismic force Fp / 控制设计地震力" highlight
+          formula={`F_p = C_p(T_p)\\,C_{ph}\\,R_p\\,W_p = ${tx(ps.partCpTp, 3)}\\times${tx(ps.partCph, 3)}\\times${tx(Wp)} = ${tx(Fp)}\\,\\mathrm{kN/m}`} />
+        
         <CalculationFormula caption="OOP seismic pressure WE / 平面外地震压力"
-          formula={`W_E = \\frac{F_{p,design}}{h_{roof}} = ${tx(oopResult.WE)}\\,\\mathrm{kPa}`} />
+          formula={`W_E = \\frac{F_p}{h_{roof,eff}} = \\frac{${tx(Fp)}}{${tx(hroofEff)}} = ${tx(WE)}\\,\\mathrm{kPa}`} />
+        
         <CalculationFormula caption="Governing wind pressure / 控制风压"
           formula={`W_{pressure} = \\max(w_{wd},\\,w_{wf}) = ${tx(oopResult.WindPressure)}\\,\\mathrm{kPa}`} />
       </CalculationSubsection>
 
+      {/* 下方的 6.2, 6.3, 6.4 保持原样不变 */}
       <CalculationSubsection title="6.2 Bending Moments & Support Conditions · 弯矩与支承条件">
         <Box sx={{ overflowX: 'auto', mb: 1.5 }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -1721,7 +1749,7 @@ export default function PrecastPanel() {
     seismicWeight: safe(inputs.seismicWeight),
     seismicDistributionFactor: safe(inputs.seismicDistributionFactor),
     psiE: safe(inputs.psiE),
-    partResponseCoefficient: safe(inputs.partResponseCoefficient),
+    partSpectralShapeFactorT0: safe(inputs.partSpectralShapeFactorT0),
     partHeightHx: safe(inputs.partHeightHx),
     buildingHeightHn: safe(inputs.buildingHeightHn),
     partImportanceFactor: safe(inputs.partImportanceFactor),
