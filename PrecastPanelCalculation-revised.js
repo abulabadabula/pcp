@@ -923,6 +923,7 @@ export function calculateOutOfPlaneDesign(input = {}) {
     const partDulicity = positive(input.partDuctilityFactorMu, 1);
     const partCh0 = positive(input.partSpectralShapeFactorT0, 1.33);
     const partC0 = partCh0 * positive(input.hazardFactor, 1) * positive(input.returnPeriodFactor, 1) * positive(input.nearFaultFactor, 1);
+    const partRp = positive(input.partRiskFactor)
 
     /* ------------------------------------------------------------------------
     Part height amplification factor Chi (AS/NZS 1170.5:2004 §8.4.2.2)
@@ -967,7 +968,7 @@ export function calculateOutOfPlaneDesign(input = {}) {
         return 0.5;
     })();
 
-    const partCpTp = partC0 * partCiTp * CHi;
+    const partCpTp = partC0 * CHi * partCiTp;
 
     const partCph = (() => {
         if (partDulicity == 1) return 1.0;
@@ -977,12 +978,9 @@ export function calculateOutOfPlaneDesign(input = {}) {
         return 0.45;
     })();
 
-    console.log("part Period:", partPeriod, "Cp:", partCiTp, "Hx:", partHx, "Hn:", partHn);
-
-
-    const Wp_panel = gammaConcrete * (tw / 1000) * hroof;
-    const Fp_panel = partCpTp * partCph * Wp_panel;
-
+    const Wp_panel = gammaConcrete * tw;
+    const Fp_panel = Math.min(partCpTp * partCph * partRp, 3.6) * Wp_panel;
+    console.log("part Period:", partPeriod, "Cp:", partCiTp, "Hx:", partHx, "Hn:", partHn, "Fp_factor:",partCpTp * partCph * partRp);
     /* ------------------------------------------------------------------------
     Wind pressure.
     ----------------------------------------------------------------------- */
@@ -1200,13 +1198,14 @@ export function calculateOutOfPlaneDesign(input = {}) {
         UR6,
         overallOK,
         partSeismic: {
+            partRp,
             CHi,
             partCiTp,
             partPeriod,
             partCph,
             partC0,
             partCpTp,
-            Wp: Wp_panel,
+            Wp_panel,
             Fp: Fp_panel,
         },
         hroofValidation: {
