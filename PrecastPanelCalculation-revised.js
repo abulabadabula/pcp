@@ -920,7 +920,7 @@ export function calculateOutOfPlaneDesign(input = {}) {
     /* ------------------------------------------------------------------------
     Part/component seismic action.AS/NZS 1170.5:2004 Clause 8.3.2
     ----------------------------------------------------------------------- */
-    const partDulicity = positive(input.partDuctilityFactorMu, 1);
+    const partDuctility = positive(input.partDuctilityFactorMu, 1);
     const partCh0 = positive(input.partSpectralShapeFactorT0, 1.33);
     const partC0 = partCh0 * positive(input.hazardFactor, 1) * positive(input.returnPeriodFactor, 1) * positive(input.nearFaultFactor, 1);
     const partRp = positive(input.partRiskFactor)
@@ -971,20 +971,17 @@ export function calculateOutOfPlaneDesign(input = {}) {
     const partCpTp = partC0 * CHi * partCiTp;
 
     const partCph = (() => {
-        if (partDulicity == 1) return 1.0;
-        if (partDulicity == 1.25) return 0.85;
-        if (partDulicity == 2.0) return 0.55;
-        if (partDulicity >= 3.0) return 0.45;
+        if (partDuctility == 1) return 1.0;
+        if (partDuctility == 1.25) return 0.85;
+        if (partDuctility == 2.0) return 0.55;
+        if (partDuctility >= 3.0) return 0.45;
         return 0.45;
     })();
 
     const Wp_panel = gammaConcrete * tw;
     const Fp_panel = Math.min(partCpTp * partCph * partRp, 3.6) * Wp_panel;
     console.log("part Period:", partPeriod, "Cp:", partCiTp, "Hx:", partHx, "Hn:", partHn, "Fp_factor:",partCpTp * partCph * partRp);
-    /* ------------------------------------------------------------------------
-    Wind pressure.
-    ----------------------------------------------------------------------- */
-    const WindPressure = Math.max(wwdPressure, wwf);
+
     /*
     Correct simply-supported / fixed-support beam moments.
     Mmid = k_mid w L²
@@ -994,11 +991,11 @@ export function calculateOutOfPlaneDesign(input = {}) {
     const Lspan = Math.max(hroof, 0);
     const x_m = Lspan / 2;
     const ME = Fp_panel * Lspan * Lspan * wsFactors.mid;
-    const MW = WindPressure * Lspan * Lspan * wsFactors.mid;
+    const MW = wwf * Lspan * Lspan * wsFactors.mid;
     let Ma = Math.max(ME, MW);
     const Na = N_GE;
     const hroof_mm = Lspan * 1000;
-    console.log("风压, 跨度", WindPressure, Lspan)
+    console.log("风压, 跨度", wwf, Lspan)
     console.log("wsFactors", wsFactors.mid, wsFactors.base)
     /*
     Additional force:
@@ -1011,7 +1008,7 @@ export function calculateOutOfPlaneDesign(input = {}) {
     const M_add_mid_M = M_add;
     Ma += M_add_mid_F + M_add_mid_M;
     let MbE = Fp_panel * Lspan * Lspan * wsFactors.base;
-    let MbW = WindPressure * Lspan * Lspan * wsFactors.base;
+    let MbW = wwf * Lspan * Lspan * wsFactors.base;
     const M_add_base_F = F_add * h_force;
     const M_add_base_M = M_add;
     MbE += M_add_base_F + M_add_base_M;
@@ -1033,23 +1030,61 @@ export function calculateOutOfPlaneDesign(input = {}) {
     Icr = n Ase (d-kd)^2 + b(kd)^3/3
     For a 1 m strip, b = 1000 mm.
     */
-    const Ase = fy > 0 ? Math.max((Na * 1000 + AWV * fy) / fy, 0) : 0;
-    const Icr = n * Ase * Math.pow(depthRebar - k * depthRebar, 2) + 1000 * Math.pow(Math.max(k * depthRebar, 0), 3) / 3;
-    const pDeltaDen = 0.75 * 48 * Ec * Icr;
-    const pDeltaFactor = pDeltaDen > 0 ? (5 * Na * Math.pow(hroof_mm, 2)) / pDeltaDen : 0;
+    const b_strip = 1000; // 1米宽条带, mm
+    const d = depthRebar; // mm
+    const As = AWV;       // 竖向钢筋面积, mm2
+    
+    // 求解中和轴高度 x (即 kd): 1000 * x^2 / 2 + n * As * x - n * As * d = 0
+    const A_quad = 500;
+    const B_quad = n * As;
+    const C_quad = -n * As * d;
+    const discriminant = B_quad * B_quad - 4 * A_quad * C_quad;
+    const kd = discriminant >= 0 ? Math.max((-B_quad + Math.sqrt(discriminant)) / (2 * A_quad), 0) : 0;
+    
+    // 计算 Icr
+    const Icr = (b_strip * Math.pow(kd, 3) / 3) + (n * As * Math.pow(d - kd, 2));
     /*
     Once the P-Delta denominator becomes zero/negative, the elastic
     amplification model has reached instability and the result is not a
     valid finite capacity calculation.
     */
-    const pDeltaStable = pDeltaFactor < 0.95;
+    // 1. 必须使用设计轴力 Nmax (kN)，而不是未乘系数的 N_GE
+    const N_design_kN = Nmax; 
+    const N_design_N = N_design_kN * 1000; // 转换为 N，匹配 Ec(MPa) 和 Icr(mm4)
+
+    // 2. 根据支撑条件确定 P-Delta 临界力系数 k_pdelta
+    // 简支均布荷载等效临界力系数为 48/5 = 9.6 (或 pi^2 ≈ 9.87)
+    // 悬臂 (Fixed-Free) 均布荷载等效临界力系数约为 2.0
+    let k_pdelta = 9.6; 
+    if (supportWS === 'Fixed-Free') {
+        k_pdelta = 2.0; 
+    } else if (supportWS === 'Fixed-Fixed') {
+        k_pdelta = 39.5; // 4 * pi^2
+    } else if (supportWS === 'Fixed-Pinned') {
+        k_pdelta = 20.2; // 2 * pi^2
+    }
+
+    // 3. 计算 P-Delta 放大因子 (N* / N_cr)
+    // N_cr = k_pdelta * Ec * Icr / L^2
+    const pDeltaFactor = (Ec * Icr) > 0 ? (N_design_N * Math.pow(hroof_mm, 2)) / (k_pdelta * Ec * Icr) : 0;
+    
+    // 4. 稳定性判断与弯矩放大
+    const pDeltaStable = pDeltaFactor < 0.95; 
     const pDeltaDenominator = 1 - pDeltaFactor;
+    
+    // 放大后的跨中弯矩
     const M_prime = Math.abs(pDeltaDenominator) > 1e-9 ? Ma / pDeltaDenominator : Infinity;
-    const delta_u = pDeltaDen > 0 ? (5 * M_prime * Math.pow(hroof_mm, 2)) / pDeltaDen : Infinity;
+    const delta_u = pDeltaDenominator > 0 ? (5 * M_prime * Math.pow(hroof_mm, 2)) / pDeltaDen : Infinity;
+    
     const UR1 = phiMn > 0 ? M_prime / phiMn : Infinity;
     const UR2 = phiMn > 0 ? Math.max(MbE, MbW) / phiMn : Infinity;
     console.log("phiMn, M_prime/phiMn:", phiMn, M_prime / phiMn)
     console.log("UR1, UR2", UR1, UR2)
+
+
+
+
+
     /* ------------------------------------------------------------------------
     Fire.
     ----------------------------------------------------------------------- */
@@ -1075,7 +1110,7 @@ export function calculateOutOfPlaneDesign(input = {}) {
     ----------------------------------------------------------------------- */
 
     const VE = Fp_panel + F_add;
-    const Vw = (5 / 8) * WindPressure * fireSpan + F_add;
+    const Vw = (5 / 8) * wwf * fireSpan + F_add;
     const vc1 = 0.25 * Math.sqrt(Math.max(fc, 0)) + (Ag > 0 ? Na / (4 * Ag) : 0);
     const Vc = vc1 * depthRebar / 1000;
     const Vs = AWH * fy * depthRebar / Hspace / 1000;
@@ -1146,7 +1181,7 @@ export function calculateOutOfPlaneDesign(input = {}) {
         x_m,
         ME,
         MW,
-        WindPressure,
+        wwf,
         Ma,
         Na,
         Ts,
@@ -1154,12 +1189,9 @@ export function calculateOutOfPlaneDesign(input = {}) {
         c,
         k,
         phiMn,
-        Ase,
-        Icr,
-        pDeltaFactor,
-        pDeltaStable,
-        M_prime,
-        delta_u,
+        As,
+
+
         UR1,
         MbE,
         MbW,
@@ -1197,6 +1229,14 @@ export function calculateOutOfPlaneDesign(input = {}) {
         phiMn_foot,
         UR6,
         overallOK,
+        pDelta: {
+            Icr,
+            pDeltaFactor,
+            pDeltaStable,
+            M_prime,
+            delta_u,
+            k_pdelta,
+        },
         partSeismic: {
             partRp,
             CHi,
