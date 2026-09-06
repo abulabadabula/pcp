@@ -88,13 +88,14 @@ export function calculateInPlaneSectionChecks(input = {}, inPlane = {}) {
     const Mstar = positive(sectionactions.Mtotal);
     const Vstar = positive(sectionactions.Vtotal);
 
-    const fc = positive(input.fc);
+    const fcPrime = positive(input.fc);
     const fy = positive(input.fy);
     const Es = positive(input.Es, 200000);
     const epsCu = 0.003;
-    const alpha1 = 0.85;
+    /* NZS 3101:2006 Cl 7.4.2.7: Eq. 7-2; */
+    const alpha1 = (fcPrime <= 55) ? 0.85 : Math.max(0.85 - 0.004 * (fcPrime - 55), 0.75);
     /* NZS 3101:2006 Cl 7.4.2.7: beta1 = 0.85 for fc <= 30, reduced 0.008/MPa, min 0.65 */
-    const beta1 = Math.max(0.85 - 0.008 * Math.max(fc - 30, 0), 0.65);
+    const beta1 = (fcPrime <= 30) ? 0.85 : Math.max(0.85 - 0.008 * Math.max(fcPrime - 30, 0), 0.65);
     const phiFlexure = positive(input.phiFlexure, 0.85);
 
     const Ag = geo.Ag;
@@ -155,7 +156,7 @@ export function calculateInPlaneSectionChecks(input = {}, inPlane = {}) {
 
     function evaluateSection(c) {
         const a = Math.min(beta1 * c, L);
-        const Cc = alpha1 * fc * t * a;
+        const Cc = alpha1 * fcPrime * t * a;
         const xCc = a / 2;
         let steelAxial = 0;
         let steelMomentAboutEdge = 0;
@@ -245,13 +246,13 @@ export function calculateInPlaneSectionChecks(input = {}, inPlane = {}) {
     const momentRatio = phiMn > 0 ? Mstar / phiMn : Infinity;
 
     /* P0 扣除钢筋面积（NZS 3101 Cl 10.3.4.2 形式） */
-    const P0 = alpha1 * fc * Math.max(Ag - AsTotal, 0) + AsTotal * fy;
+    const P0 = alpha1 * fcPrime * Math.max(Ag - AsTotal, 0) + AsTotal * fy;
     const phiPn = phiFlexure * P0 / 1000;
     const axialRatio = phiPn > 0 ? Nstar / phiPn : 0;
 
     const interactionRatio = momentRatio;
 
-    const grossConcreteCapacity = fc * Ag;
+    const grossConcreteCapacity = fcPrime * Ag;
     const lowAxialRatio = grossConcreteCapacity > 0 ? (Nstar * 1000) / grossConcreteCapacity : 0;
 
     const steelResults = sectionResult.steelResults || [];
@@ -269,7 +270,7 @@ export function calculateInPlaneSectionChecks(input = {}, inPlane = {}) {
         Nstar,
         Mstar,
         Vstar,
-        fc,
+        fc: fcPrime,
         fy,
         Es,
         epsCu,
@@ -454,6 +455,7 @@ export function calculateBoundaryElementNM(input = {}, ctx = {}) {
     const r = Ag_m2 > 0 ? Math.min(Ab_m2 / Ag_m2, 1) : 0;
     const Gb = r * (finite(ctx.Gwall) + finite(ctx.GlineTotal));
     const Qb = r * finite(ctx.QlineTotal);
+    console.log("ctx:",ctx)
     const demandCases = [{
         key: 'D0',
         label: '1.35G (permanent)',
@@ -646,6 +648,7 @@ export function calculateInPlaneDesign(input = {}) {
     /* ------------------------------------------------------------------------
     Boundary element N-M.
     ----------------------------------------------------------------------- */
+    console.log("Gwall:", Gwall, "GlineTotal:",GlineTotal,"QlineTotal:",QlineTotal,"Ngravity:",Ngravity,"seismicGravity:",seismicGravity,"lintelReaction:",lintelReaction,"lintelEcc:",lintelEccFromFace)
     const boundaryNM = calculateBoundaryElementNM(input, {
         Gwall,
         GlineTotal,
@@ -654,8 +657,9 @@ export function calculateInPlaneDesign(input = {}) {
         seismicGravity,
         psiE,
         lintelReaction,
-        lintelEcc
+        lintelEcc: lintelEccFromFace
     });
+    console.log("boundaryNM:",boundaryNM)
     const phiPn = boundaryNM.available ? boundaryNM.keyPoints.phiP0 : 0;
     const phiMn = boundaryNM.available ? boundaryNM.keyPoints.phiM0 : 0;
     const axialRatio = phiPn > 0 ? NseismicCompression / phiPn : boundaryNM.available ? Infinity : 0;
