@@ -1,3 +1,5 @@
+import { min } from "date-fns";
+
 /* ============================================================================
 NUMERICAL HELPERS
 =========================================================================== */
@@ -588,9 +590,38 @@ export function calculateInPlaneDesign(input = {}) {
     const Ch = positive(input.spectralShapeFactor);
     const Nt = positive(input.nearFaultFactor, 1);
     const NFP = positive(input.period);
-    const kmu = NFP >= 0.7 ? mu : (mu - 1) * NFP / 0.7 + 1;
+    /* 
+    * NZS 1170.5:2004 Clause 5.2.1.1 - Ductility factor modification (kμ)
+    * 正确读取字符串类型的 subsoilClass，并按场地类别区分过渡周期
+    */
+    const SoilClass = String(input.subsoilClass || 'C').toUpperCase();
+    let kmu;
+
+    if (SoilClass === 'E') {
+        // Site Class E (Soft soil)
+        if ((NFP >= 1.0) || (mu < 1.5)) {
+            kmu = mu;
+        } else if ((NFP < 1.0) && (mu >= 1.5)) {
+            kmu = (mu - 1.5) * NFP  + 1.5;
+        }
+    } 
+    else if (SoilClass === 'A' || SoilClass === 'B' || SoilClass === 'C' || SoilClass === 'D') {
+        // Site Class A, B, C, D
+        if (NFP >= 0.7) {
+            kmu = mu;
+        } else {
+            kmu = (mu - 1) * (NFP / 0.7) + 1;
+        }
+    }
+    else {
+        kmu = mu;
+    }
+
     const CT1 = Ch * Z * Ru * Nt;
-    const Cd = CT1 * Sp / kmu;
+    const CdT1UlsH = CT1 * Sp / kmu;
+    // console.log("subsoilclass:",SoilClass,"kmu:",kmu)
+
+
     /* Diaphragm forces: act at wall top, produce moment = F × h */
     const VdiaphragmWind = diaphragmWindForce;
     const VdiaphragmSeismic = diaphragmSeismicForce;
@@ -602,14 +633,14 @@ export function calculateInPlaneDesign(input = {}) {
     const seismicGravity = Gi + psiE * QlineTotal;
     /* BRANZ 指南算例：屋面/线荷载惯性力作用于墙顶，墙体自重惯性力沿高度分布
        （合力作用于半高）。总剪力仍为 Cd×W，弯矩按分布修正。 */
-    const FseismicTop = Cd * (GlineTotal + psiE * QlineTotal);
-    const FseismicWall = Cd * Gwall;
+    const FseismicTop = CdT1UlsH * (GlineTotal + psiE * QlineTotal);
+    const FseismicWall = CdT1UlsH * Gwall;
     const Vseismic = FseismicTop + FseismicWall;
     const Mseismic = FseismicTop * hwall + FseismicWall * hwall / 2;
     const NseismicCompression = seismicGravity + lintelReaction;
     const NseismicTension = seismicGravity - lintelReaction;
     /* 屋面/墙顶连接设计剪力：按 μ=1 系数与设计系数之比放大（指南 §8.2.1(ix)、§10.1） */
-    const roofConnectionAmplification = Cd > 0 ? CT1 / Cd : 1;
+    const roofConnectionAmplification = CdT1UlsH > 0 ? CT1 / CdT1UlsH : 1;
     const roofConnectionShear = FseismicTop * roofConnectionAmplification;
     /* Lintel eccentricity（偏心距统一取自墙形心） */
     const Mlintel = lintelReaction * lintelEcc;
@@ -797,7 +828,7 @@ export function calculateInPlaneDesign(input = {}) {
         },
         seismic: {
             CT1,
-            Cd,
+            CdT1UlsH,
             Sp,
             kmu,
             FseismicTop,
@@ -977,9 +1008,10 @@ export function calculateOutOfPlaneDesign(input = {}) {
     const gPressure = positive(input.gUniform);
     const qPressure = positive(input.qUniform);
     const wwdPressure = positive(input.wwd);
-    const wd = gPressure * Sr;
-    const wq = qPressure * Sr;
+    const Wd_line = gPressure * Sr;
+    const Wq_line = qPressure * Sr;
     const wwdLine = wwdPressure * Sr;
+    const lintel_force = positive(input.lintelReaction)
     /* OOP specific loads */
     const wwf = positive(input.wwf);
     const qU = positive(input.qU);
@@ -994,9 +1026,9 @@ export function calculateOutOfPlaneDesign(input = {}) {
     /*
     One-metre strip: Ag = t, I = t³/12, Z = t²/6
     */
-    const Ag = tw * 1000;
-    const Ig = 1000 * Math.pow(tw * 1000, 3) / 12;
-    const Iw = Lw * Ig;
+    const Ag = tw * Lw * 1e6; //mm2
+    const IgperM = 1000 * Math.pow(tw * 1000, 3) / 12;
+    const Iw = Lw * IgperM;
     const ZperM = tw > 0 ? Math.pow(tw, 2) / 6 : 0;
     const Z = Lw * ZperM;
     const AWV = areaBar(Vbar) * 1000 / Vspace;
@@ -1011,13 +1043,13 @@ export function calculateOutOfPlaneDesign(input = {}) {
     /* 配筋率：ρ = As[mm²/m] / (1000 × t_mm)，无量纲 */
     const rhoV = tw > 0 ? AWV / (tw * 1e6) : 0;
     const rhoH = tw > 0 ? AWH / (tw * 1e6) : 0;
+    console.log("rhoV:",rhoV, "rhoH:",rhoH)
     /* ------------------------------------------------------------------------
     Gravity actions per metre of wall（单位已修正：tf/ts/ds 为 mm）。
     P-Δ 轴力 = 外部轴力 + 中点以上墙重（BRANZ 指南 §4.6）；
     基础梁/板/土重只作为抗倾覆的稳定重量。
     ----------------------------------------------------------------------- */
-    const Wd_line = wd;
-    const Wq_line = wq;
+
     const wallHeightAboveFooting = Math.max(Hw - tf / 1000, 0);
     const NSW = tw * wallHeightAboveFooting * gammaConcrete / 2;   /* 中点以上墙重（P-Δ 用） */
     const NSW_full = tw * wallHeightAboveFooting * gammaConcrete;  /* 全墙重（抗倾覆用） */
@@ -1028,9 +1060,9 @@ export function calculateOutOfPlaneDesign(input = {}) {
     const N_GE = Wd_line + NSW;                                    /* 面板中轴力（kN/m） */
     const N_stab = NFF + NSF + NHF;                                /* 稳定重量（kN/m） */
     const Nmax = Math.max(1.35 * N_GE, 1.2 * N_GE + 1.5 * Wq_line);
-    /* ------------------------------------------------------------------------
-    Part/component seismic action. AS/NZS 1170.5:2004 Clause 8.3.2
-    ----------------------------------------------------------------------- */
+    /* =======================================================================
+    Part/component seismic action. AS/NZS 1170.5:2004 Clause 8.3.2 平面外地震力计算
+    ======================================================================= */
     const partDuctility = positive(input.partDuctilityFactorMu, 1);
     const partCh0 = positive(input.partSpectralShapeFactorT0, 1.33);
     const partC0 = partCh0 * positive(input.hazardFactor, 1) * positive(input.returnPeriodFactor, 1) * positive(input.nearFaultFactor, 1);
@@ -1089,6 +1121,11 @@ export function calculateOutOfPlaneDesign(input = {}) {
     /* §8.3.2 上限 3.6Wp（请与正文核对），下限也请核对 */
     const Fp_panel = Math.min(partCpTp * partCph * partRp, 3.6) * Wp_panel;
 
+
+    /* =======================================================================
+    稳定性四项检查（BRANZ 指南 §8.4 / NZS 3101 Cl 11.3.4）
+    ======================================================================= */
+
     /* ------------------------------------------------------------------------
     有效高度系数 k（BRANZ 指南 Table 5 / NZS 3101 Table 11.1）
     ----------------------------------------------------------------------- */
@@ -1098,11 +1135,9 @@ export function calculateOutOfPlaneDesign(input = {}) {
         'Fixed-Fixed': 0.7,
         'Fixed-Free': 2.0  /* 纯悬臂：有效高度 2H（指南 §4.6） */
     }[supportWS] || 1.0;
-    const kWall = input.wallKFactor > 0 ? finite(input.wallKFactor) : kWallDefault;
+    const kWall = kWallDefault;
 
-    /* ------------------------------------------------------------------------
-    稳定性四项检查（BRANZ 指南 §8.4 / NZS 3101 Cl 11.3.4）
-    ----------------------------------------------------------------------- */
+
     const H_stab_mm = Hw * 1000;
     const t_stab_mm = tw * 1000;
     const L_stab_mm = Lw * 1000;
@@ -1113,29 +1148,35 @@ export function calculateOutOfPlaneDesign(input = {}) {
 
     /* (3) Euler 屈曲：由指南式 B2 推导（E=900fc、EIeff=0.25Ig、π²×75/4=185）：
        (kH/t)² = 185 / λe，λe = (P+0.5W)/(fc'Ag) + 0.4ρt·fy/fc' */
-    const P_stab_N = Wd_line * 1000;                    /* 屋面重力（每米宽，N） */
-    const W_stab_N = tw * Hw * gammaConcrete * 1000;    /* 墙自重（每米宽，N） */
-    const Ag_stab_mm2 = t_stab_mm * 1000;               /* 每米宽截面面积 */
+    const P_stab_N = (1.2 * Wd_line + 1.5 * Wq_line) * Lw + lintel_force;  /* 屋面重力，KN */
+    const W_stab_N = tw * Hw * gammaConcrete;    /* 墙自重，KN */
     const lambda_euler = fc > 0 ?
-        (P_stab_N + 0.5 * W_stab_N) / (fc * Ag_stab_mm2) + 0.4 * rhoV * fy / fc :
+        (P_stab_N + 0.5 * W_stab_N) * 1000 / (fc * Ag) + 0.4 * rhoV * fy / fc :
         Infinity;
     const kHt_eulerCapacity = lambda_euler > 0 && Number.isFinite(lambda_euler) ?
-        Math.sqrt(185 / lambda_euler) :
+        Math.sqrt(15 / lambda_euler) :
         Infinity;
     const cond3_euler = kHt_ratio <= kHt_eulerCapacity;
+    console.log("lamb:",lambda_euler, "kht:", kHt_eulerCapacity, "cond3:", cond3_euler)
 
     /* (4) Vlasov/Timoshenko 弯扭屈曲（指南式 B4/B5）：
        Mcrit = 0.6·(900fc)·t³·L/(kH)；Mdemand = 0.5(P+0.5W+Ast·fy)·L */
-    const E_dyn = 900 * fc; /* MPa（指南取动态模量 900fc） */
-    const Ast_stab_mm2 = AWS; /* 全墙竖向筋面积 */
-    const Mcrit_vlasov = kWall * H_stab_mm > 0 ?
-        0.6 * E_dyn * Math.pow(t_stab_mm, 3) * L_stab_mm / (kWall * H_stab_mm) :
-        0; /* N·mm */
-    const Mdemand_vlasov = 0.5 * (P_stab_N * Lw + 0.5 * W_stab_N * Lw + Ast_stab_mm2 * fy) * L_stab_mm; /* N·mm */
-    const cond4_vlasov = Mcrit_vlasov > 0 && Mdemand_vlasov <= Mcrit_vlasov;
-    const lambda_vlasov_a = fc > 0 ?
-        (P_stab_N + 0.5 * W_stab_N) / (fc * Ag_stab_mm2) + 0.5 * rhoV * fy / fc :
-        Infinity;
+    // const E_dyn = 900 * fc; /* MPa（指南取动态模量 900fc） */
+    // const Ast_stab_mm2 = AWS; /* 全墙竖向筋面积 */
+    // const Mcrit_vlasov = kWall * H_stab_mm > 0 ?
+    //     0.6 * E_dyn * Math.pow(t_stab_mm, 3) * L_stab_mm / (kWall * H_stab_mm) :
+    //     0; /* N·mm */
+    // const Mdemand_vlasov = 0.5 * (P_stab_N * Lw + 0.5 * W_stab_N * Lw + Ast_stab_mm2 * fy) * L_stab_mm; /* N·mm */
+    // const cond4_vlasov = Mcrit_vlasov > 0 && Mdemand_vlasov <= Mcrit_vlasov;
+    // const lambda_vlasov_a = fc > 0 ?
+    //     (P_stab_N + 0.5 * W_stab_N) / (fc * Ag) + 0.5 * rhoV * fy / fc :
+    //     Infinity;
+    const geometryTerm = kHt_ratio * Math.sqrt(Hw * Lw) / tw / 12;
+    const lambda_caseA = (P_stab_N + 0.5 * W_stab_N) * 1000 / (fc * Ag) + rhoV * fy / fc;
+    const Mestar = Lw * Fp_panel * Math.pow(hroofEffective, 2) / 8;
+    const lambda_caseB = 2.2 * (Mestar * 1e6) / L_stab_mm / fc / Ag;
+    const lambda_less = Math.min(lambda_caseA,lambda_caseB);
+    const cond4_vlasov = lambda_less >= (1/geometryTerm)**2;
     const stabilityAllOK = cond1_Ht && cond2_kHt && cond3_euler && cond4_vlasov;
 
     /*
@@ -1366,7 +1407,7 @@ export function calculateOutOfPlaneDesign(input = {}) {
         n,
         Ag,
         d: depthRebar,
-        Ig,
+        Ig: IgperM,
         Iw,
         Z,
         ZperM,
@@ -1409,19 +1450,23 @@ export function calculateOutOfPlaneDesign(input = {}) {
         barDiaMaxOK,
         barDiaMinOK,
         tiesRequired,
-        kWall,
+
         stability: {
             kWall,
             Ht_ratio,
             kHt_ratio,
             cond1_Ht,
             cond2_kHt,
+            P_stab_N,
+            W_stab_N,
             lambda_euler,
             kHt_eulerCapacity,
             cond3_euler,
-            lambda_vlasov_a,
-            Mdemand_vlasov,
-            Mcrit_vlasov,
+            geometryTerm,
+            lambda_caseA,
+            lambda_caseB,
+            Mestar,
+            lambda_less,
             cond4_vlasov,
             allOK: stabilityAllOK
         },

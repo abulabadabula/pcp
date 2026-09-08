@@ -486,7 +486,7 @@ function GeoBlock({ inputs, ResinPlane, ResoutOfPlane }) {
         <CalculationFormula caption="Gross area / 毛截面面积"
           formula={`A_g = (b\\times1000)(t\\times1000) = (${tx(geo.bwall)}\\times1000)(${tx(geo.twall)}\\times1000) = ${tx(geo.Ag, 0)}\\,\\mathrm{mm^2}`} />
         <CalculationFormula caption="Second moment of area / 惯性矩"
-          formula={`I = \\frac{(t\\times1000)(b\\times1000)^3}{12} = \\frac{(${tx(geo.twall)}\\times1000)(${tx(geo.bwall)}\\times1000)^3}{12} = ${tx(geo.I, 0)}\\,\\mathrm{mm^4}`} />
+          formula={`I_g = \\frac{(t\\times1000)(b\\times1000)^3}{12} = \\frac{(${tx(geo.twall)}\\times1000)(${tx(geo.bwall)}\\times1000)^3}{12} = ${tx(geo.I, 0)}\\,\\mathrm{mm^4}`} />
         <CalculationFormula caption="Section modulus / 截面模量"
           formula={`Z_g = \\frac{(t\\times1000)(b\\times1000)^2}{6} = \\frac{(${tx(geo.twall)}\\times1000)(${tx(geo.bwall)}\\times1000)^2}{6} = ${tx(geo.Zg, 0)}\\,\\mathrm{mm^3}`} />
       </CalculationSubsection>
@@ -579,29 +579,30 @@ function LoadDerivationBlock({ inputs, ResinPlane, ResoutOfPlane }) {
    3. In-Plane Seismic Action
    --------------------------------------------------------------------------- */
 function InPlaneSeismicBlock({ inputs, inPlane }) {
-  const s = inPlane.seismic || {};
-  const g = inPlane.gravity || {};
+  const seismicInp = inPlane.seismic || {};
+  const gravityInp = inPlane.gravity || {};
+  // console.log("inplaneSeismic input:", inputs)
 
   return (
     <CalculationSection number="3" title="In-Plane Seismic Action · 平面内抗震作用" chip={<Chip size="small" label="AS/NZS 1170.5 §3.2.2" />}>
       <CalculationFormula caption="Elastic site hazard coefficient / 弹性场地危险系数"
-        formula={`C(T_1) = C_h(T_1)\\,Z\\,R_u\\,N(T,D) = ${tx(s.Ch)}\\times${tx(s.Z)}\\times${tx(s.Ru)}\\times${tx(s.Nt)} = ${tx(s.CT1, 4)}`} />
+        formula={`C(T_1) = C_h(T_1)\\,Z\\,R_u\\,N(T,D) = ${tx(seismicInp.Ch)}\\times${tx(seismicInp.Z)}\\times${tx(seismicInp.Ru)}\\times${tx(seismicInp.Nt)} = ${tx(seismicInp.CT1, 4)}`} />
       <CalculationFormula caption="Structural performance factor / 结构性能系数"
-        formula={`S_p = \\max(0.7,\\;1.3 - 0.3\\mu) = \\max(0.7,\\;1.3 - 0.3\\times${tx(s.mu)}) = ${tx(s.Sp)}`} />
+        formula={`S_p = \\max(0.7,\\;1.3 - 0.3\\mu) = \\max(0.7,\\;1.3 - 0.3\\times${tx(seismicInp.mu)}) = ${tx(seismicInp.Sp)}`} />
       <CalculationFormula caption="Ductility modification kμ / 延性修正系数"
-        formula={`k_\\mu = ${tx(s.kmu, 3)} \\quad (T_1 = ${tx(inputs.period)}\\,\\mathrm{s},\\;\\mu = ${tx(s.mu)})`} />
+        formula={`k_\\mu = ${tx(seismicInp.kmu, 3)} \\quad (T_1 = ${tx(inputs.period)}\\,\\mathrm{s},\\;\\mu = ${tx(seismicInp.mu)},\\;\\text{Soil class} = \\text{${inputs.subsoilClass}})`} />
       <CalculationFormula caption="Design action coefficient / 设计作用系数"
-        formula={`C_d(T_1) = \\frac{C(T_1)\\,S_p}{k_\\mu} = \\frac{${tx(s.CT1, 4)}\\times${tx(s.Sp)}}{${tx(s.kmu, 3)}} = ${tx(s.Cd, 4)}`} />
+        formula={`C_d(T_1) = \\frac{C(T_1)\\,S_p}{k_\\mu} = \\frac{${tx(seismicInp.CT1, 4)}\\times${tx(seismicInp.Sp)}}{${tx(seismicInp.kmu, 3)}} = ${tx(seismicInp.CdT1UlsH, 4)}`} />
       <CalculationFormula caption="Seismic weight / 地震重力荷载"
-        formula={`W_i = G_i + \\psi_E Q = ${tx(s.Gi, 2)}+${tx(s.psiE)}\\times${tx(g.QlineTotal)} = ${tx(s.seismicGravity)}\\,\\mathrm{kN}`} />
+        formula={`W_i = G_i + \\psi_E Q = ${tx(seismicInp.Gi, 2)}+${tx(seismicInp.psiE)}\\times${tx(gravityInp.QlineTotal)} = ${tx(seismicInp.seismicGravity)}\\,\\mathrm{kN}`} />
       <CalculationFormula caption="Seismic force at top (roof inertia) / 顶部地震力"
-        formula={`F_{top} = C_d\\times(G_{line}+\\psi_E Q) = ${tx(s.Cd, 4)}\\times(${tx(g.GlineTotal)}+${tx(s.psiE)}\\times${tx(g.QlineTotal)}) = ${tx(s.FseismicTop)}\\,\\mathrm{kN}`} />
+        formula={`F_{top} = C_d\\times(G_{line}+\\psi_E Q) = ${tx(seismicInp.CdT1UlsH, 4)}\\times(${tx(gravityInp.GlineTotal)}+${tx(seismicInp.psiE)}\\times${tx(gravityInp.QlineTotal)}) = ${tx(seismicInp.FseismicTop)}\\,\\mathrm{kN}`} />
       <CalculationFormula caption="Seismic force from wall self-weight / 墙体自重地震力"
-        formula={`F_{wall} = C_d\\times G_{wall} = ${tx(s.Cd, 4)}\\times${tx(g.Gwall)} = ${tx(s.FseismicWall)}\\,\\mathrm{kN}`} />
+        formula={`F_{wall} = C_d\\times G_{wall} = ${tx(seismicInp.CdT1UlsH, 4)}\\times${tx(gravityInp.Gwall)} = ${tx(seismicInp.FseismicWall)}\\,\\mathrm{kN}`} />
       <CalculationFormula caption="Total base shear / 基底总剪力" highlight
-        formula={`V^*_{seismic} = F_{top}+F_{wall} = ${tx(s.FseismicTop)}+${tx(s.FseismicWall)} = ${tx(s.Vseismic)}\\,\\mathrm{kN}`} />
+        formula={`V^*_{seismic} = F_{top}+F_{wall} = ${tx(seismicInp.FseismicTop)}+${tx(seismicInp.FseismicWall)} = ${tx(seismicInp.Vseismic)}\\,\\mathrm{kN}`} />
       <CalculationFormula caption="Overturning moment / 倾覆弯矩" highlight
-        formula={`M^*_{seismic} = F_{top}\\,h + F_{wall}\\,\\frac{h}{2} = ${tx(s.FseismicTop)}\\times${tx(inputs.wallHeight)}+${tx(s.FseismicWall)}\\times\\frac{${tx(inputs.wallHeight)}}{2} = ${tx(s.Mseismic)}\\,\\mathrm{kN\\cdot m}`} />
+        formula={`M^*_{seismic} = F_{top}\\,h + F_{wall}\\,\\frac{h}{2} = ${tx(seismicInp.FseismicTop)}\\times${tx(inputs.wallHeight)}+${tx(seismicInp.FseismicWall)}\\times\\frac{${tx(inputs.wallHeight)}}{2} = ${tx(seismicInp.Mseismic)}\\,\\mathrm{kN\\cdot m}`} />
     </CalculationSection>
   );
 }
@@ -817,7 +818,7 @@ function OutOfPlaneWindSeismicBlock({ inputs, outOfPlane }) {
         <CalculationFormula caption="Site hazard coefficient C0 / 场地危险系数"
           formula={`C_0 = C_h(T_0)\\,Z\\,R_u\\,N(T,D) = ${tx(ps.partC0, 3)}`} />
         <CalculationFormula caption="Height amplification CHi / 高度放大系数 (§8.4.2.2)"
-          formula={`C_{Hi} = ${tx(ps.CHi, 3)}`} />
+          formula={`C_{Hi} = \\min\\left(1+\\frac{h_x}{6},\\; 1+10\\frac{h_x}{h_n} \\text{ or } 3.0\\right) = ${tx(ps.CHi, 3)}`} />
         <CalculationFormula caption="Period-dependent factor Ci(Tp) / 周期相关系数"
           formula={`C_i(T_p) = ${tx(ps.partCiTp, 3)} \\quad (T_p = ${tx(ps.partPeriod, 3)}\\,\\mathrm{s})`} />
         <CalculationFormula caption="Cp(Tp) at top / 顶部地震水平系数" highlight
@@ -829,9 +830,9 @@ function OutOfPlaneWindSeismicBlock({ inputs, outOfPlane }) {
         <CalculationFormula caption="Wall panel weight Wp / 墙板每延米重量"
           formula={`W_p = \\gamma_c\\,t_w = ${tx(inputs.concreteDensity)}\\times${tx(inputs.wallThickness)} = ${tx(ps.Wp_panel)}\\,\\mathrm{kPa}`} />
         <CalculationFormula caption="Design seismic pressure Fp / 设计地震压力" highlight
-          formula={`F_p = \\min(C_p C_{ph} R_p,\\;3.6)\\,W_p = \\min(${tx(ps.partCpTp, 3)}\\times${tx(ps.partCph, 3)}\\times${tx(ps.partRp, 3)},\\;3.6)\\times${tx(ps.Wp_panel)} = ${tx(ps.Fp_panel, 3)}\\,\\mathrm{kPa}`} />
+          formula={`F_{p} = \\min(C_p(T_p)\\,C_{ph}\\,R_p\\,W_p,\\; 3.6W_p) = \\min(${tx(ps.partCpTp, 3)}\\times${tx(ps.partCph, 3)}\\times${tx(ps.partRp, 3)},\\;3.6)\\times${tx(ps.Wp_panel)} = ${tx(ps.Fp_panel, 3)}\\,\\mathrm{kPa}`} />
         <CalculationFormula caption="OOP wind pressure / OOP风压"
-          formula={`w_{wf} = ${tx(oop.wwf)}\\,\\mathrm{kPa}`} />
+          formula={`W_{p} = ${tx(oop.wwf)}\\,\\mathrm{kPa}`} />
       </CalculationSubsection>
 
       <CalculationSubsection title="6.2 Bending Moments & Support Conditions · 弯矩与支承条件">
@@ -865,7 +866,7 @@ function OutOfPlaneWindSeismicBlock({ inputs, outOfPlane }) {
         <CalculationFormula caption="Seismic moment ME / 地震弯矩"
           formula={`M_E = F_p\\,h_{roof}^2\\,k_{mid} = ${tx(ps.Fp_panel, 3)}\\times${tx(hroofEff)}^2\\times${tx(wsF.mid, 4)} = ${tx(oop.ME, 2)}\\,\\mathrm{kN\\cdot m/m}`} />
         <CalculationFormula caption="Wind moment MW / 风弯矩"
-          formula={`M_W = w_{wf}\\,h_{roof}^2\\,k_{mid} = ${tx(oop.wwf)}\\times${tx(hroofEff)}^2\\times${tx(wsF.mid, 4)} = ${tx(oop.MW, 2)}\\,\\mathrm{kN\\cdot m/m}`} />
+          formula={`M_W = W_{p}\\,h_{roof}^2\\,k_{mid} = ${tx(oop.wwf)}\\times${tx(hroofEff)}^2\\times${tx(wsF.mid, 4)} = ${tx(oop.MW, 2)}\\,\\mathrm{kN\\cdot m/m}`} />
         <CalculationFormula caption="Mid-height moment Ma / 中部弯矩" highlight
           formula={`M_a = \\max(M_E, M_W) + \\Delta M_{add} = ${tx(oop.Ma, 2)}\\,\\mathrm{kN\\cdot m/m}`} />
         <CalculationFormula caption="Minimum eccentricity moment / 最小偏心弯矩 (Cl 11.3.1.2)"
@@ -944,8 +945,82 @@ function OutOfPlaneFireBlock({ inputs, outOfPlane }) {
 /* ---------------------------------------------------------------------------
    8. Wall Stability Check (from engine)
    --------------------------------------------------------------------------- */
+// function StabilityBlock({ inputs, inPlane, outOfPlane }) {
+//   const stab = outOfPlane?.stability || {};
+//   const kWall = safe(stab.kWall, 1);
+//   const Ht = safe(stab.Ht_ratio);
+//   const kHt = safe(stab.kHt_ratio);
+//   const cond1 = stab.cond1_Ht !== false;
+//   const cond2 = stab.cond2_kHt !== false;
+//   const cond3 = stab.cond3_euler !== false;
+//   const cond4 = stab.cond4_vlasov !== false;
+//   const allOK = stab.allOK !== false;
+
+//   const stabilityRows = [
+//     ['8.4.1 H/t ≤ 75', `H/t = ${tx(Ht)} ≤ 75`, cond1],
+//     ['8.4.2 kH/t ≤ 65', `k = ${tx(kWall, 2)}, kH/t = ${tx(kHt)} ≤ 65`, cond2],
+//     ['8.4.3 Euler buckling', `kH/t = ${tx(kHt)} ≤ ${tx(safe(stab.kHt_eulerCapacity), 2)}`, cond3],
+//     ['8.4.4 Vlasov LTB', `M_{demand} = ${tx(safe(stab.Mdemand_vlasov) / 1e6, 2)} kN·m ≤ M_{crit} = ${tx(safe(stab.Mcrit_vlasov) / 1e6, 2)} kN·m`, cond4]
+//   ];
+
+//   return (
+//     <CalculationSection number="8" title="Wall Stability Check · 稳定计算" chip={<Chip size="small" label="BRANZ Guide §8.4" />}>
+//       <Alert severity={allOK ? 'success' : 'warning'} sx={{ mb: 2 }}>
+//         BRANZ §8.4 wall panel stability: H/t, kH/t, Euler buckling, Vlasov lateral torsional buckling.
+//       </Alert>
+//       <Box sx={{ overflowX: 'auto', mb: 2 }}>
+//         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+//           <thead>
+//             <tr>
+//               {['Stability check', 'Result', 'Status'].map(hd => (
+//                 <th key={hd} style={{ textAlign: hd === 'Stability check' ? 'left' : 'right', padding: '6px 10px', borderBottom: '2px solid #e5e7eb', fontWeight: 800 }}>{hd}</th>
+//               ))}
+//             </tr>
+//           </thead>
+//           <tbody>
+//             {stabilityRows.map(([label, value, pass]) => (
+//               <tr key={label}>
+//                 <td style={{ padding: '6px 10px', borderBottom: '1px solid #eee', fontWeight: 600 }}>{label}</td>
+//                 <td style={{ textAlign: 'right', padding: '6px 10px', borderBottom: '1px solid #eee', fontVariantNumeric: 'tabular-nums' }}>{value}</td>
+//                 <td style={{ textAlign: 'right', padding: '6px 10px', borderBottom: '1px solid #eee' }}>
+//                   <Chip size="small" label={pass ? 'PASS' : 'CHECK'} color={pass ? 'success' : 'warning'} sx={{ fontWeight: 700 }} />
+//                 </td>
+//               </tr>
+//             ))}
+//           </tbody>
+//         </table>
+//       </Box>
+//       <CalculationSubsection title="8.4.1–8.4.2 Slenderness limits · 长细比限值">
+//         <CalculationFormula caption="H/t ≤ 75"
+//           formula={`\\frac{H}{t} = ${tx(Ht)} \\le 75`}
+//           status={mkStatus(cond1, 'PASS', 'CHECK')} />
+//         <CalculationFormula caption="kH/t ≤ 65"
+//           formula={`k = ${tx(kWall, 2)}, \\quad \\frac{kH}{t} = ${tx(kHt)} \\le 65`}
+//           status={mkStatus(cond2, 'PASS', 'CHECK')} />
+//       </CalculationSubsection>
+//       <CalculationSubsection title="8.4.3 Euler buckling · Euler 屈曲稳定">
+//         <CalculationFormula caption="Euler parameter λe / Euler 荷载参数"
+//           formula={`\\lambda_e = ${tx(safe(stab.lambda_euler), 4)}`} />
+//         <CalculationFormula caption="Euler capacity / Euler 稳定限值"
+//           formula={`\\left(\\frac{kH}{t}\\right)_{cap} = \\sqrt{185/\\lambda_e} = ${tx(safe(stab.kHt_eulerCapacity), 2)}`}
+//           status={mkStatus(cond3, 'PASS', 'CHECK')} />
+//       </CalculationSubsection>
+//       <CalculationSubsection title="8.4.4 Vlasov lateral torsional buckling · 侧向扭转屈曲">
+//         <CalculationFormula caption="Critical moment / 临界弯矩"
+//           formula={`M_{crit} = ${tx(safe(stab.Mcrit_vlasov) / 1e6, 2)}\\,\\mathrm{kN\\cdot m}`} />
+//         <CalculationFormula caption="Demand moment / 需求弯矩"
+//           formula={`M_{demand} = ${tx(safe(stab.Mdemand_vlasov) / 1e6, 2)}\\,\\mathrm{kN\\cdot m}`} />
+//         <CalculationFormula caption="Overall Vlasov check / 弯扭稳定"
+//           formula={`M_{demand} \\le M_{crit} \\quad\\Rightarrow\\quad ${cond4 ? 'PASS' : 'CHECK'}`}
+//           highlight status={mkStatus(cond4, 'PASS', 'CHECK')} />
+//       </CalculationSubsection>
+//     </CalculationSection>
+//   );
+// }
+
 function StabilityBlock({ inputs, inPlane, outOfPlane }) {
   const stab = outOfPlane?.stability || {};
+  const geometry = outOfPlane || {};
   const kWall = safe(stab.kWall, 1);
   const Ht = safe(stab.Ht_ratio);
   const kHt = safe(stab.kHt_ratio);
@@ -964,54 +1039,68 @@ function StabilityBlock({ inputs, inPlane, outOfPlane }) {
 
   return (
     <CalculationSection number="8" title="Wall Stability Check · 稳定计算" chip={<Chip size="small" label="BRANZ Guide §8.4" />}>
-      <Alert severity={allOK ? 'success' : 'warning'} sx={{ mb: 2 }}>
-        BRANZ §8.4 wall panel stability: H/t, kH/t, Euler buckling, Vlasov lateral torsional buckling.
-      </Alert>
-      <Box sx={{ overflowX: 'auto', mb: 2 }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-          <thead>
-            <tr>
-              {['Stability check', 'Result', 'Status'].map(hd => (
-                <th key={hd} style={{ textAlign: hd === 'Stability check' ? 'left' : 'right', padding: '6px 10px', borderBottom: '2px solid #e5e7eb', fontWeight: 800 }}>{hd}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {stabilityRows.map(([label, value, pass]) => (
-              <tr key={label}>
-                <td style={{ padding: '6px 10px', borderBottom: '1px solid #eee', fontWeight: 600 }}>{label}</td>
-                <td style={{ textAlign: 'right', padding: '6px 10px', borderBottom: '1px solid #eee', fontVariantNumeric: 'tabular-nums' }}>{value}</td>
-                <td style={{ textAlign: 'right', padding: '6px 10px', borderBottom: '1px solid #eee' }}>
-                  <Chip size="small" label={pass ? 'PASS' : 'CHECK'} color={pass ? 'success' : 'warning'} sx={{ fontWeight: 700 }} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Box>
-      <CalculationSubsection title="8.4.1–8.4.2 Slenderness limits · 长细比限值">
-        <CalculationFormula caption="H/t ≤ 75"
-          formula={`\\frac{H}{t} = ${tx(Ht)} \\le 75`}
-          status={mkStatus(cond1, 'PASS', 'CHECK')} />
-        <CalculationFormula caption="kH/t ≤ 65"
-          formula={`k = ${tx(kWall, 2)}, \\quad \\frac{kH}{t} = ${tx(kHt)} \\le 65`}
-          status={mkStatus(cond2, 'PASS', 'CHECK')} />
+       <Box sx={{ overflowX: 'auto', mb: 2 }}>
+         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+           <thead>
+             <tr>
+               {['Stability check', 'Result', 'Status'].map(hd => (
+                 <th key={hd} style={{ textAlign: hd === 'Stability check' ? 'left' : 'right', padding: '6px 10px', borderBottom: '2px solid #e5e7eb', fontWeight: 800 }}>{hd}</th>
+               ))}
+             </tr>
+           </thead>
+           <tbody>
+             {stabilityRows.map(([label, value, pass]) => (
+               <tr key={label}>
+                 <td style={{ padding: '6px 10px', borderBottom: '1px solid #eee', fontWeight: 600 }}>{label}</td>
+                 <td style={{ textAlign: 'right', padding: '6px 10px', borderBottom: '1px solid #eee', fontVariantNumeric: 'tabular-nums' }}>{value}</td>
+                 <td style={{ textAlign: 'right', padding: '6px 10px', borderBottom: '1px solid #eee' }}>
+                   <Chip size="small" label={pass ? 'PASS' : 'CHECK'} color={pass ? 'success' : 'warning'} sx={{ fontWeight: 700 }} />
+                 </td>
+               </tr>
+             ))}
+           </tbody>
+         </table>
+       </Box>
+       <CalculationSubsection title="8.4.1–8.4.2 Slenderness limits · 长细比限值">
+         <CalculationFormula caption="H/t ≤ 75"
+           formula={`\\frac{H}{t} = \\frac{${tx(inputs.wallHeight)}}{${tx(inputs.wallThickness)}} = ${tx(Ht)} \\le 75`}
+           status={mkStatus(cond1, 'PASS', 'CHECK')} />
+         <CalculationFormula caption="kH/t ≤ 65"
+           formula={`k = ${tx(kWall, 2)}, \\quad \\frac{kH}{t} = ${tx(kHt)} \\le 65`}
+           status={mkStatus(cond2, 'PASS', 'CHECK')} />
+       </CalculationSubsection>
+
+      <CalculationSubsection title="8.4.3 Euler buckling stability · Euler 屈曲稳定">
+        <CalculationFormula caption="Gross wall area / 墙体毛截面面积" formula={`A_g = (${tx(inputs.wallWidth)}\\times1000)(${tx(inputs.wallThickness)}\\times1000) = ${tx(geometry.Ag, 0)}\\,\\mathrm{mm^2}`} />
+        <CalculationFormula caption="Roof gravity load P / 屋面重力荷载 P" formula={`P = ${tx(stab.P_stab_N)}\\,\\mathrm{kN}`} />
+        <CalculationFormula caption="Wall self-weight W / 墙体自重 W" formula={`W = ${tx(stab.W_stab_N)}\\,\\mathrm{kN}`} />
+        <CalculationFormula caption="Euler load parameter / Euler 荷载参数" formula={`\\Lambda_E = \\frac{P+0.5W}{f'_cA_g} + 0.4\\rho_t\\frac{f_y}{f'_c} = ${tx(stab.lambda_euler, 4)}`} />
+        <CalculationFormula caption="Euler stability inequality / Euler 稳定不等式" formula={`\\frac{kH}{t} = ${tx(kHt)} \\le \\frac{15}{\\Lambda_E} = \\frac{15}{${tx(stab.lambda_euler, 4)}} = ${tx(stab.kHt_eulerCapacity, 2)}`} status={mkStatus(stab.cond3_euler, 'PASS', 'CHECK')} />
       </CalculationSubsection>
-      <CalculationSubsection title="8.4.3 Euler buckling · Euler 屈曲稳定">
-        <CalculationFormula caption="Euler parameter λe / Euler 荷载参数"
-          formula={`\\lambda_e = ${tx(safe(stab.lambda_euler), 4)}`} />
-        <CalculationFormula caption="Euler capacity / Euler 稳定限值"
-          formula={`\\left(\\frac{kH}{t}\\right)_{cap} = \\sqrt{185/\\lambda_e} = ${tx(safe(stab.kHt_eulerCapacity), 2)}`}
-          status={mkStatus(cond3, 'PASS', 'CHECK')} />
-      </CalculationSubsection>
-      <CalculationSubsection title="8.4.4 Vlasov lateral torsional buckling · 侧向扭转屈曲">
-        <CalculationFormula caption="Critical moment / 临界弯矩"
-          formula={`M_{crit} = ${tx(safe(stab.Mcrit_vlasov) / 1e6, 2)}\\,\\mathrm{kN\\cdot m}`} />
-        <CalculationFormula caption="Demand moment / 需求弯矩"
-          formula={`M_{demand} = ${tx(safe(stab.Mdemand_vlasov) / 1e6, 2)}\\,\\mathrm{kN\\cdot m}`} />
-        <CalculationFormula caption="Overall Vlasov check / 弯扭稳定"
-          formula={`M_{demand} \\le M_{crit} \\quad\\Rightarrow\\quad ${cond4 ? 'PASS' : 'CHECK'}`}
-          highlight status={mkStatus(cond4, 'PASS', 'CHECK')} />
+
+      <CalculationSubsection title="8.4.4 Lateral torsional buckling · 侧向扭转屈曲">
+        <CalculationFormula caption="Geometry term X / 几何项" 
+          formula={`X = \\frac{kH}{t} \\cdot \\frac{\\sqrt{H \\cdot L}}{12 \\cdot t} = \\frac{${tx(stab.kHt_ratio, 2)} \\cdot \\sqrt{${tx(inputs.wallHeight)} \\cdot ${tx(inputs.wallWidth)}}}{12 \\cdot ${tx(inputs.wallThickness)}} = ${tx(stab.geometryTerm, 3)}`} />
+        
+        <CalculationFormula caption="Case (a) load parameter / 情况 (a) 荷载参数" 
+          formula={`\\lambda_a = \\frac{P + 0.5W}{f'_c A_g} + \\rho_t \\frac{f_y}{f'_c} = \\frac{(${tx(stab.P_stab_N, 2)} + 0.5 \\times ${tx(stab.W_stab_N, 2)}) \\times 1000}{${tx(inputs.fc)} \\times ${tx(safe(inPlane.geometry.Ag), 0)}} + ${tx(safe(outOfPlane.rhoV), 4)} \\times \\frac{${tx(inputs.fy)}}{${tx(inputs.fc)}} = ${tx(stab.lambda_caseA, 4)}`} />
+          
+        <CalculationFormula caption="Design moment M_e^* / 设计弯矩" 
+          formula={`M_e^* = \\frac{L_w \\cdot F_p \\cdot h_{roof}^2}{8} = \\frac{${tx(inputs.wallWidth)} \\cdot ${tx(safe(outOfPlane.partSeismic.Fp_panel), 3)} \\cdot ${tx(safe(outOfPlane.hroofValidation.hroofEffective), 2)}^2}{8} = ${tx(stab.Mestar, 2)}\\,\\mathrm{kN\\cdot m}`} />
+          
+        <CalculationFormula caption="Case (b) elastic moment parameter / 情况 (b) 弹性弯矩参数" 
+          formula={`\\lambda_b = \\frac{2.2 M_e^*}{L \\cdot f'_c \\cdot A_g} = \\frac{2.2 \\times ${tx(stab.Mestar, 2)}}{${tx(inputs.wallWidth * 1000)} \\cdot ${tx(inputs.fc)} \\cdot ${tx(safe(inPlane.geometry.Ag), 0)}} = ${tx(stab.lambda_caseB, 4)}`} />
+          
+        <CalculationFormula caption="Governing parameter / 控制参数" 
+          formula={`\\lambda = \\min(\\lambda_a, \\lambda_b) = \\min(${tx(stab.lambda_caseA, 4)}, ${tx(stab.lambda_caseB, 4)}) = ${tx(stab.lambda_less, 4)}`} />
+          
+        <CalculationFormula caption="Overall lateral torsional stability / 总体侧向扭转稳定" highlight 
+          formula={`\\lambda \\ge \\left(\\frac{1}{X}\\right)^2 \\quad\\Rightarrow\\quad ${tx(stab.lambda_less, 4)} \\ge \\left(\\frac{1}{${tx(stab.geometryTerm, 3)}}\\right)^2 = ${tx(1 / Math.pow(safe(stab.geometryTerm, 1), 2), 4)} \\quad\\Rightarrow\\quad ${stab.cond4_vlasov ? 'PASS' : 'CHECK'}`} 
+          status={mkStatus(stab.cond4_vlasov, 'PASS', 'CHECK')} />
+          
+        <CalculationFormula caption="Overall stability result / 总体稳定结果" highlight 
+          formula={`\\text{Overall stability} = ${stab.allOK ? 'PASS' : 'CHECK'}`} 
+          status={mkStatus(stab.allOK, 'PASS', 'CHECK')} />
       </CalculationSubsection>
     </CalculationSection>
   );
